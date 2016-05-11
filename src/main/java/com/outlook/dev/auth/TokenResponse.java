@@ -1,5 +1,8 @@
 package com.outlook.dev.auth;
 
+import java.util.Calendar;
+import java.util.Date;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -21,6 +24,8 @@ public class TokenResponse {
 	private String errorDescription;
 	@JsonProperty("error_codes")
 	private int[] errorCodes;
+	private Date expirationTime;
+	
 	public String getTokenType() {
 		return tokenType;
 	}
@@ -38,6 +43,9 @@ public class TokenResponse {
 	}
 	public void setExpiresIn(int expiresIn) {
 		this.expiresIn = expiresIn;
+		Calendar now = Calendar.getInstance();
+		now.add(Calendar.SECOND, expiresIn);
+		this.expirationTime = now.getTime();
 	}
 	public String getAccessToken() {
 		return accessToken;
@@ -74,5 +82,8 @@ public class TokenResponse {
 	}
 	public void setErrorCodes(int[] errorCodes) {
 		this.errorCodes = errorCodes;
+	}
+	public Date getExpirationTime() {
+		return expirationTime;
 	}
 }

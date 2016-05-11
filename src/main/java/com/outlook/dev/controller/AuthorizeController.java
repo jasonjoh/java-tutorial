@@ -37,6 +37,8 @@ public class AuthorizeController {
 			if (idTokenObj != null) {
 				TokenResponse tokenResponse = AuthHelper.getTokenFromAuthCode(code, idTokenObj.getTenantId());
 				session.setAttribute("accessToken", tokenResponse.getAccessToken());
+				session.setAttribute("userConnected", true);
+				session.setAttribute("userName", idTokenObj.getName());
 			} else {
 				session.setAttribute("error", "ID token failed validation.");
 			}
@@ -44,5 +46,12 @@ public class AuthorizeController {
 			session.setAttribute("error", "Unexpected state returned from authority.");
 		}
 		return "mail";
+	}
+	
+	@RequestMapping("/logout")
+	public String logout(HttpServletRequest request) {
+		HttpSession session = request.getSession();
+		session.invalidate();
+		return "redirect:/index.html";
 	}
 }
