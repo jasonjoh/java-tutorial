@@ -8,15 +8,20 @@ import java.util.UUID;
 
 import org.springframework.web.util.UriComponentsBuilder;
 
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
+
 public class AuthHelper {
 	private static final String authority = "https://login.microsoftonline.com";
 	private static final String authorizeUrl = authority + "/common/oauth2/v2.0/authorize";
-	private static final String tokenUrl = authority + "/%s/oauth2/v2.0/token";
 	
 	private static String[] scopes = { 
 		"openid", 
 		"offline_access",
 		"profile", 
+		"email", 
 		"https://outlook.office.com/mail.read"
 	};
 	
@@ -96,5 +101,34 @@ public class AuthHelper {
 		urlBuilder.queryParam("response_mode", "form_post");
 		
 		return urlBuilder.toUriString();
+	}
+	
+	public static TokenResponse getTokenFromAuthCode(String authCode, String tenantId) {
+		// Create a logging interceptor to log request and responses
+		HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
+		interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+		
+		OkHttpClient client = new OkHttpClient.Builder()
+				.addInterceptor(interceptor).build();
+		
+		// Create and configure the Retrofit object
+		Retrofit retrofit = new Retrofit.Builder()
+				.baseUrl(authority)
+				.client(client)
+				.addConverterFactory(JacksonConverterFactory.create())
+				.build();
+		
+		// Generate the token service
+		TokenService tokenService = retrofit.create(TokenService.class);
+		
+		try {
+			return tokenService.getAccessTokenFromAuthCode(tenantId, getAppId(), getAppPassword(), 
+					"authorization_code", authCode, getRedirectUrl()).execute().body();
+		} catch (IOException e) {
+			TokenResponse error = new TokenResponse();
+			error.setError("IOException");
+			error.setErrorDescription(e.getMessage());
+			return error;
+		}
 	}
 }

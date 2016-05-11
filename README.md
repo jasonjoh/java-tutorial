@@ -441,7 +441,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuthHelper {
 	private static final String authority = "https://login.microsoftonline.com";
 	private static final String authorizeUrl = authority + "/common/oauth2/v2.0/authorize";
-	private static final String tokenUrl = authority + "/%s/oauth2/v2.0/token";
 	
 	private static String[] scopes = { 
 		"openid", 
@@ -586,12 +585,14 @@ public class AuthorizeController {
 			RedirectAttributes redirectAttributes) {
 		// Get the expected state value from the session
 		HttpSession session = request.getSession();
-		UUID expectedState = (UUID) request.getSession().getAttribute("expected_state");
+		UUID expectedState = (UUID) session.getAttribute("expected_state");
+    UUID expectedNonce = (UUID) session.getAttribute("expected_nonce");
 		
 		// Make sure that the state query parameter returned matches
 		// the expected state
 		if (state.equals(expectedState)) {
 			session.setAttribute("authCode", code);
+      session.setAttribute("idToken", idToken);
 		}
 		else {
 			session.setAttribute("error", "Unexpected state returned from authority.");
@@ -613,10 +614,12 @@ Finally let's create the `mail` view. Right-click the **jsp** (**Deployed Resour
 
 <pre><code>Auth code: ${authCode}
 
-ID token: ${idToken}</code></pre>
+ID token: ${idToken}
+
+Access token: ${accessToken}</code></pre>
 ```
 
-For now, the view is simply going to show us the authorization code, so we can confirm that our sign-in works. We'll update this later once we add more functionality to our app.
+For now, the view is simply going to show us the authorization code and ID token, so we can confirm that our sign-in works. We'll update this later once we add more functionality to our app.
 
 Open the `pages.xml` file (**Deployed Resources**, **webapp**, **WEB-INF**, **defs**) and add the following code to the bottom of the file, *before* the `</tiles-definitions>` line:
 
@@ -628,11 +631,374 @@ Open the `pages.xml` file (**Deployed Resources**, **webapp**, **WEB-INF**, **de
 </definition>
 ```
 
-Save all of your changes and restart the app. Browse to http://localhost:8080 and click the login button. Sign in with an Office 365 or Outlook.com account. Once you sign in and grant access to your information, the browser should redirect to the app, which displays the authorization code.
+Save all of your changes and restart the app. Browse to http://localhost:8080 and click the login button. Sign in with an Office 365 or Outlook.com account. Once you sign in and grant access to your information, the browser should redirect to the app, which displays the authorization code and ID token.
 
 ![](./readme-images/auth-code.PNG)
 
 ### Exchanging the code for a token ###
+
+The next step is to exchange the authorization code for an access token. In order to do that, we need to parse the ID token and extract some information from it. ID tokens are [JSON web tokens](https://tools.ietf.org/rfc/rfc7519.txt), so we'll need a JSON parser. Let's start by adding a dependency to the [Jackson](http://wiki.fasterxml.com/JacksonHome/) library. In `pom.xml`, add the following lines before the `</dependencies>` line:
+
+```xml
+<dependency>
+  <groupId>com.fasterxml.jackson.core</groupId>
+  <artifactId>jackson-core</artifactId>
+  <version>2.7.4</version>
+</dependency>
+
+<dependency>
+  <groupId>com.fasterxml.jackson.core</groupId>
+  <artifactId>jackson-annotations</artifactId>
+  <version>2.7.4</version>
+</dependency>
+
+<dependency>
+  <groupId>com.fasterxml.jackson.core</groupId>
+  <artifactId>jackson-databind</artifactId>
+  <version>2.7.4</version>
+</dependency>
+```
+
+Now let's create a class to represent the ID token. Right-click the `com.outlook.dev.auth` package and choose **New**, then **Class**. Name the class `IdToken` and click **Finish**. Replace the entire contents of the `IdToken.java` file with the following code:
+
+```java
+package com.outlook.dev.auth;
+
+import java.util.Base64;
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class IdToken {
+	// NOTE: This is just a subset of the claims returned in the
+	// ID token. For a full listing, see:
+	// https://azure.microsoft.com/en-us/documentation/articles/active-directory-v2-tokens/#idtokens
+	@JsonProperty("exp")
+	private long expirationTime;
+	@JsonProperty("nbf")
+	private long notBefore;
+	@JsonProperty("tid")
+	private String tenantId;
+	private String nonce;
+	private String name;
+	private String email;
+	@JsonProperty("preferred_username")
+	private String preferredUsername;
+	@JsonProperty("oid")
+	private String objectId;
+	
+	public static IdToken parseEncodedToken(String encodedToken, String nonce) {
+		// Encoded token is in three parts, separated by '.'
+		String[] tokenParts = encodedToken.split("\\.");
+		
+		// The three parts are: header.token.signature
+		String idToken = tokenParts[1];
+		
+		byte[] decodedBytes = Base64.getUrlDecoder().decode(idToken);
+		
+		ObjectMapper mapper = new ObjectMapper();
+		IdToken newToken = null;
+		try {
+			newToken = mapper.readValue(decodedBytes, IdToken.class);
+			if (!newToken.isValid(nonce)) {
+				return null;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} 
+		return newToken;
+	}
+
+	public long getExpirationTime() {
+		return expirationTime;
+	}
+
+	public void setExpirationTime(long expirationTime) {
+		this.expirationTime = expirationTime;
+	}
+
+	public long getNotBefore() {
+		return notBefore;
+	}
+
+	public void setNotBefore(long notBefore) {
+		this.notBefore = notBefore;
+	}
+
+	public String getTenantId() {
+		return tenantId;
+	}
+
+	public void setTenantId(String tenantId) {
+		this.tenantId = tenantId;
+	}
+
+	public String getNonce() {
+		return nonce;
+	}
+
+	public void setNonce(String nonce) {
+		this.nonce = nonce;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
+	}
+
+	public String getPreferredUsername() {
+		return preferredUsername;
+	}
+
+	public void setPreferredUsername(String preferredUsername) {
+		this.preferredUsername = preferredUsername;
+	}
+
+	public String getObjectId() {
+		return objectId;
+	}
+
+	public void setObjectId(String objectId) {
+		this.objectId = objectId;
+	}
+	
+	private Date getUnixEpochAsDate(long epoch) {
+		// Epoch timestamps are in seconds,
+		// but Jackson converts integers as milliseconds.
+		// Rather than create a custom deserializer, this helper will do 
+		// the conversion.
+		return new Date(epoch * 1000);
+	}
+	
+	private boolean isValid(String nonce) {
+		// This method does some basic validation
+		// For more information on validation of ID tokens, see
+		// https://azure.microsoft.com/en-us/documentation/articles/active-directory-v2-tokens/#validating-tokens
+		Date now = new Date();
+		
+		// Check expiration and not before times
+		if (now.after(this.getUnixEpochAsDate(this.expirationTime)) ||
+				now.before(this.getUnixEpochAsDate(this.notBefore))) {
+			// Token is not within it's valid "time"
+			return false;
+		}
+		
+		// Check nonce
+		if (!nonce.equals(this.getNonce())) {
+			// Nonce mismatch
+			return false;
+		}
+		
+		return true;
+	}
+}
+```
+
+While we're at it, let's create a similar class to represent the token response expected from the Azure token endpoint. Right-click the `com.outlook.dev.auth` package and choose **New**, then **Class**. Name the class `TokenResponse` and click **Finish**. Replace the entire contents of the `IdToken.java` file with the following code:
+
+```java
+package com.outlook.dev.auth;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class TokenResponse {
+	@JsonProperty("token_type")
+	private String tokenType;
+	private String scope;
+	@JsonProperty("expires_in")
+	private int expiresIn;
+	@JsonProperty("access_token")
+	private String accessToken;
+	@JsonProperty("refresh_token")
+	private String refreshToken;
+	@JsonProperty("id_token")
+	private String idToken;
+	private String error;
+	@JsonProperty("error_description")
+	private String errorDescription;
+	@JsonProperty("error_codes")
+	private int[] errorCodes;
+	public String getTokenType() {
+		return tokenType;
+	}
+	public void setTokenType(String tokenType) {
+		this.tokenType = tokenType;
+	}
+	public String getScope() {
+		return scope;
+	}
+	public void setScope(String scope) {
+		this.scope = scope;
+	}
+	public int getExpiresIn() {
+		return expiresIn;
+	}
+	public void setExpiresIn(int expiresIn) {
+		this.expiresIn = expiresIn;
+	}
+	public String getAccessToken() {
+		return accessToken;
+	}
+	public void setAccessToken(String accessToken) {
+		this.accessToken = accessToken;
+	}
+	public String getRefreshToken() {
+		return refreshToken;
+	}
+	public void setRefreshToken(String refreshToken) {
+		this.refreshToken = refreshToken;
+	}
+	public String getIdToken() {
+		return idToken;
+	}
+	public void setIdToken(String idToken) {
+		this.idToken = idToken;
+	}
+	public String getError() {
+		return error;
+	}
+	public void setError(String error) {
+		this.error = error;
+	}
+	public String getErrorDescription() {
+		return errorDescription;
+	}
+	public void setErrorDescription(String errorDescription) {
+		this.errorDescription = errorDescription;
+	}
+	public int[] getErrorCodes() {
+		return errorCodes;
+	}
+	public void setErrorCodes(int[] errorCodes) {
+		this.errorCodes = errorCodes;
+	}
+}
+```
+
+Now let's add a function to the `AuthHelper` class to make the token request. This process involves sending an HTTP POST request to the token issuing endpoint. To do this, we'll use the [Retrofit](http://square.github.io/retrofit/) library. This library will also come in handy once we get to calling the Mail API. In `pom.xml`, add the following lines before the `</dependencies>` line:
+
+```xml
+<dependency>
+  <groupId>com.squareup.retrofit2</groupId>
+  <artifactId>retrofit</artifactId>
+  <version>2.0.2</version>
+</dependency>
+<dependency>
+  <groupId>com.squareup.retrofit2</groupId>
+  <artifactId>converter-jackson</artifactId>
+  <version>2.0.2</version>
+</dependency>
+<dependency>
+  <groupId>com.squareup.okhttp3</groupId>
+  <artifactId>logging-interceptor</artifactId>
+  <version>3.2.0</version>
+</dependency>
+```
+
+Let's create an API declaration for the token issuing endpoint. Right-click the `com.outlook.dev.auth` package and choose **New**, then **Interface**. Name the class `TokenService` and click **Finish**. Replace the entire contents of the `TokenService.java` file with the following code:
+
+```java
+package com.outlook.dev.auth;
+
+import retrofit2.Call;
+import retrofit2.http.Field;
+import retrofit2.http.FormUrlEncoded;
+import retrofit2.http.POST;
+import retrofit2.http.Path;
+
+public interface TokenService {
+
+	@FormUrlEncoded
+	@POST("/{tenantid}/oauth2/v2.0/token")
+	Call<TokenResponse> getAccessTokenFromAuthCode(
+		@Path("tenantid") String tenantId,
+		@Field("client_id") String clientId,
+		@Field("client_secret") String clientSecret,
+		@Field("grant_type") String grantType,
+		@Field("code") String code,
+		@Field("redirect_uri") String redirectUrl
+	);
+}
+```
+
+Now we can add the function to `AuthHelper`. In `AuthHelper.java`, add the following import statements:
+
+```java
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
+```
+
+Also in `AuthHelper.java`, add the following function:
+
+```java
+public static TokenResponse getTokenFromAuthCode(String authCode, String tenantId) {
+  // Create a logging interceptor to log request and responses
+  HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
+  interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+  
+  OkHttpClient client = new OkHttpClient.Builder()
+      .addInterceptor(interceptor).build();
+  
+  // Create and configure the Retrofit object
+  Retrofit retrofit = new Retrofit.Builder()
+      .baseUrl(authority)
+      .client(client)
+      .addConverterFactory(JacksonConverterFactory.create())
+      .build();
+  
+  // Generate the token service
+  TokenService tokenService = retrofit.create(TokenService.class);
+  
+  try {
+    return tokenService.getAccessTokenFromAuthCode(tenantId, getAppId(), getAppPassword(), 
+        "authorization_code", authCode, getRedirectUrl()).execute().body();
+  } catch (IOException e) {
+    TokenResponse error = new TokenResponse();
+    error.setError("IOException");
+    error.setErrorDescription(e.getMessage());
+    return error;
+  }
+}
+```
+
+In the `AuthorizeController.java` file, replace the following lines in the `authorize` function:
+
+```java
+session.setAttribute("authCode", code);
+session.setAttribute("idToken", idToken);
+```
+
+with the following code:
+
+```java
+IdToken idTokenObj = IdToken.parseEncodedToken(idToken, expectedNonce.toString());
+if (idTokenObj != null) {
+  TokenResponse tokenResponse = AuthHelper.getTokenFromAuthCode(code, idTokenObj.getTenantId());
+  session.setAttribute("accessToken", tokenResponse.getAccessToken());
+} else {
+  session.setAttribute("error", "ID token failed validation.");
+}
+```
+
+Save all of your changes, restart the app, and browse to http://localhost:8080. This time if you log in, you should see an access token
 
 ## Using the Mail API ##
 

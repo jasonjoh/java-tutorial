@@ -7,4 +7,6 @@
 
 <pre><code>Auth code: ${authCode}
 
-ID token: ${idToken}</code></pre>
+ID token: ${idToken}
+
+Access token: ${accessToken}</code></pre>

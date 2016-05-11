@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.outlook.dev.auth.AuthHelper;
+import com.outlook.dev.auth.IdToken;
+import com.outlook.dev.auth.TokenResponse;
+
 @Controller
 public class AuthorizeController {
 
@@ -21,15 +25,22 @@ public class AuthorizeController {
 			HttpServletRequest request) {
 		// Get the expected state value from the session
 		HttpSession session = request.getSession();
-		UUID expectedState = (UUID) request.getSession().getAttribute("expected_state");
+		UUID expectedState = (UUID) session.getAttribute("expected_state");
+		UUID expectedNonce = (UUID) session.getAttribute("expected_nonce");
+		session.removeAttribute("expected_state");
+		session.removeAttribute("expected_nonce");
 		
 		// Make sure that the state query parameter returned matches
 		// the expected state
 		if (state.equals(expectedState)) {
-			session.setAttribute("authCode", code);
-			session.setAttribute("idToken", idToken);
-		}
-		else {
+			IdToken idTokenObj = IdToken.parseEncodedToken(idToken, expectedNonce.toString());
+			if (idTokenObj != null) {
+				TokenResponse tokenResponse = AuthHelper.getTokenFromAuthCode(code, idTokenObj.getTenantId());
+				session.setAttribute("accessToken", tokenResponse.getAccessToken());
+			} else {
+				session.setAttribute("error", "ID token failed validation.");
+			}
+		} else {
 			session.setAttribute("error", "Unexpected state returned from authority.");
 		}
 		return "mail";
