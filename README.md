@@ -1400,12 +1400,12 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   
   ```java
   private static String[] scopes = { 
-  "openid", 
-  "offline_access",
-  "profile", 
-  "email", 
-  "https://outlook.office.com/mail.read",
-  "https://outlook.office.com/calendars.read"
+    "openid", 
+    "offline_access",
+    "profile", 
+    "email", 
+    "https://outlook.office.com/mail.read",
+    "https://outlook.office.com/calendars.read"
 };
   ```
 1. Create a class in the `com.outlook.dev.service` package for the [Event entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesEvent).
@@ -1495,9 +1495,9 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   ```java
   @GET("/api/v2.0/me/events")
 Call<PagedResult<Event>> getEvents(
-  @Query("$orderby") String orderBy,
-  @Query("$select") String select,
-  @Query("$top") Integer maxResults
+      @Query("$orderby") String orderBy,
+      @Query("$select") String select,
+      @Query("$top") Integer maxResults
 );
   ```
 1. Add a controller for viewing events to the `com.outlook.dev.controller` package.
@@ -1672,13 +1672,13 @@ Call<PagedResult<Event>> getEvents(
 
   ```java
   private static String[] scopes = { 
-  "openid", 
-  "offline_access",
-  "profile", 
-  "email", 
-  "https://outlook.office.com/mail.read",
-  "https://outlook.office.com/calendars.read",
-  "https://outlook.office.com/contacts.read"
+    "openid", 
+    "offline_access",
+    "profile", 
+    "email", 
+    "https://outlook.office.com/mail.read",
+    "https://outlook.office.com/calendars.read",
+    "https://outlook.office.com/contacts.read"
 };
   ```
 1. Create a class in the `com.outlook.dev.service` package for the [Contact entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesContact).
@@ -1738,9 +1738,9 @@ Call<PagedResult<Event>> getEvents(
   ```java
   @GET("/api/v2.0/me/contacts")
 Call<PagedResult<Contact>> getContacts(
-  @Query("$orderby") String orderBy,
-  @Query("$select") String select,
-  @Query("$top") Integer maxResults
+      @Query("$orderby") String orderBy,
+      @Query("$select") String select,
+      @Query("$top") Integer maxResults
 );
   ```
 1. Add a controller for viewing contacts to the `com.outlook.dev.controller` package.
