@@ -1397,6 +1397,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
 ### For Calendar API: ###
 
 1. Update the `scopes` array in `AuthHelper.java` to include the `Calendars.Read` scope.
+  
   ```java
   private static String[] scopes = { 
 		"openid", 
@@ -1490,6 +1491,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   }
   ```
 1. Add a `getEvents` function to the the `OutlookService` interface.
+
   ```java
   @GET("/api/v2.0/me/events")
 	Call<PagedResult<Event>> getEvents(
@@ -1647,6 +1649,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   </table>
   ```
 1. Add a page definition for `events.jsp` in `pages.xml`.
+
   ```xml
   <definition name="events" extends="common">
     <put-attribute name="title" value="My Events" />
@@ -1655,6 +1658,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   </definition>
   ```
 1. Add a nav bar entry for the events view in `base.jsp`.
+
   ```jsp
   <li class="${current == 'events' ? 'active' : '' }">
     <a href="<spring:url value="/events.html" />">Events</a>
@@ -1665,6 +1669,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
 ### For Contacts API: ###
 
 1. Update the `scopes` array in `AuthHelper.java` to include the `Contacts.Read` scope.
+
   ```java
   private static String[] scopes = { 
 		"openid", 
@@ -1729,6 +1734,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   }
   ```
 1. Add a `getContacts` function to the the `OutlookService` interface.
+
   ```java
   @GET("/api/v2.0/me/contacts")
 	Call<PagedResult<Contact>> getContacts(
@@ -1889,6 +1895,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   </table>
   ```
 1. Add a page definition for `events.jsp` in `pages.xml`.
+
   ```xml
   <definition name="contacts" extends="common">
     <put-attribute name="title" value="My Contacts" />
@@ -1897,6 +1904,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   </definition>
   ```
 1. Add a nav bar entry for the events view in `base.jsp`.
+
   ```jsp
   <li class="${current == 'contacts' ? 'active' : '' }">
     <a href="<spring:url value="/contacts.html" />">Contacts</a>
