@@ -36,16 +36,22 @@ public class AuthorizeController {
 			IdToken idTokenObj = IdToken.parseEncodedToken(idToken, expectedNonce.toString());
 			if (idTokenObj != null) {
 				TokenResponse tokenResponse = AuthHelper.getTokenFromAuthCode(code, idTokenObj.getTenantId());
-				session.setAttribute("accessToken", tokenResponse.getAccessToken());
+				session.setAttribute("tokens", tokenResponse);
 				session.setAttribute("userConnected", true);
 				session.setAttribute("userName", idTokenObj.getName());
+				String email = idTokenObj.getEmail();
+				if (email == null || email.isEmpty()) {
+					// Office 365 users don't have the email claim
+					email = idTokenObj.getPreferredUsername();
+				}
+				session.setAttribute("userEmail", email);
 			} else {
 				session.setAttribute("error", "ID token failed validation.");
 			}
 		} else {
 			session.setAttribute("error", "Unexpected state returned from authority.");
 		}
-		return "mail";
+		return "redirect:/mail.html";
 	}
 	
 	@RequestMapping("/logout")

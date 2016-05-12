@@ -391,11 +391,15 @@ Let's begin by creating the homepage. Open the `index.jsp` you created earlier, 
 ```jsp
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib uri="http://www.springframework.org/tags" prefix="spring" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
 
+<c:if test="${error ne null}">
+	<div class="alert alert-danger">${error}</div>
+</c:if>
 <div class="jumbotron">
 	<h1>Java Web App Tutorial</h1>
 	<p>This sample uses the Mail API to read messages in your inbox.</p>
-	<p><a class="btn btn-lg btn-primary" href="<spring:url value="#" />">Click here to login</a></p>
+	<p><a class="btn btn-lg btn-primary" href="<spring:url value="${loginUrl}" />">Click here to login</a></p>
 </div>
 ```
 
@@ -813,6 +817,9 @@ While we're at it, let's create a similar class to represent the token response 
 ```java
 package com.outlook.dev.auth;
 
+import java.util.Calendar;
+import java.util.Date;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -834,6 +841,8 @@ public class TokenResponse {
 	private String errorDescription;
 	@JsonProperty("error_codes")
 	private int[] errorCodes;
+	private Date expirationTime;
+	
 	public String getTokenType() {
 		return tokenType;
 	}
@@ -851,6 +860,9 @@ public class TokenResponse {
 	}
 	public void setExpiresIn(int expiresIn) {
 		this.expiresIn = expiresIn;
+		Calendar now = Calendar.getInstance();
+		now.add(Calendar.SECOND, expiresIn);
+		this.expirationTime = now.getTime();
 	}
 	public String getAccessToken() {
 		return accessToken;
@@ -887,6 +899,9 @@ public class TokenResponse {
 	}
 	public void setErrorCodes(int[] errorCodes) {
 		this.errorCodes = errorCodes;
+	}
+	public Date getExpirationTime() {
+		return expirationTime;
 	}
 }
 ```
@@ -993,14 +1008,387 @@ IdToken idTokenObj = IdToken.parseEncodedToken(idToken, expectedNonce.toString()
 if (idTokenObj != null) {
   TokenResponse tokenResponse = AuthHelper.getTokenFromAuthCode(code, idTokenObj.getTenantId());
   session.setAttribute("accessToken", tokenResponse.getAccessToken());
+  session.setAttribute("userConnected", true);
+  session.setAttribute("userName", idTokenObj.getName());
+  String email = idTokenObj.getEmail();
+  if (email == null || email.isEmpty()) {
+    // Office 365 users don't have the email claim
+    email = idTokenObj.getPreferredUsername();
+  }
+  session.setAttribute("userEmail", email);
 } else {
   session.setAttribute("error", "ID token failed validation.");
 }
 ```
 
-Save all of your changes, restart the app, and browse to http://localhost:8080. This time if you log in, you should see an access token
+Since we're saving the user name and tokens in the session, let's also implement a logout method in our app. Add the following function to the `AuthorizeController` class:
+
+```java
+@RequestMapping("/logout")
+public String logout(HttpServletRequest request) {
+  HttpSession session = request.getSession();
+  session.invalidate();
+  return "redirect:/index.html";
+}
+```
+
+Save all of your changes, restart the app, and browse to http://localhost:8080. This time if you log in, you should see an access token. Now that we can retrive the access token, we're ready to call the Mail API.
 
 ## Using the Mail API ##
+
+Let's start by creating a class that represents a [Message entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesMessage). Our class won't cover every field present on a message, just the ones we will use in the app.
+
+Right-click the **src/main/java** folder and choose **New**, then **Package**. Name the package `com.outlook.dev.service` and click **Finish**. Right-click the **com.outlook.dev.service** package and choose **New**, then **Class**. Name the class `Message` and click **Finish**. Replace the entire contents of the `Message.java` file with the following code:
+
+```java
+package com.outlook.dev.service;
+
+import java.util.Date;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class Message {
+	@JsonProperty("Id")
+	private String id;
+	@JsonProperty("ReceivedDateTime")
+	private Date receivedDateTime;
+	@JsonProperty("From")
+	private Recipient from;
+	@JsonProperty("IsRead")
+	private Boolean isRead;
+	@JsonProperty("Subject")
+	private String subject;
+	@JsonProperty("BodyPreview")
+	private String bodyPreview;
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public Date getReceivedDateTime() {
+		return receivedDateTime;
+	}
+	public void setReceivedDateTime(Date receivedDateTime) {
+		this.receivedDateTime = receivedDateTime;
+	}
+	public Recipient getFrom() {
+		return from;
+	}
+	public void setFrom(Recipient from) {
+		this.from = from;
+	}
+	public Boolean getIsRead() {
+		return isRead;
+	}
+	public void setIsRead(Boolean isRead) {
+		this.isRead = isRead;
+	}
+	public String getSubject() {
+		return subject;
+	}
+	public void setSubject(String subject) {
+		this.subject = subject;
+	}
+	public String getBodyPreview() {
+		return bodyPreview;
+	}
+	public void setBodyPreview(String bodyPreview) {
+		this.bodyPreview = bodyPreview;
+	}
+}
+```
+
+We defined the `from` property as type `Recipient`, which isn't defined yet. Let's create the `Recipient` class in the `com.outlook.dev.service` package, to represent the [Recipient entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#Recipient).
+
+```java
+package com.outlook.dev.service;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class Recipient {
+  @JsonProperty("EmailAddress")
+	private EmailAddress emailAddress;
+
+	public EmailAddress getEmailAddress() {
+		return emailAddress;
+	}
+
+	public void setEmailAddress(EmailAddress emailAddress) {
+		this.emailAddress = emailAddress;
+	}
+}
+```
+
+That class has just one property, of type `EmailAddress`, which we will now define as a new class in the `com.outlook.dev.service` package. We'll use this to represent the [EmailAddress type](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#EmailAddress).
+
+```java
+package com.outlook.dev.service;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class EmailAddress {
+	@JsonProperty("Name")
+	private String name;
+	@JsonProperty("Address")
+	private String address;
+	
+	public String getName() {
+		return name;
+	}
+	public void setName(String name) {
+		this.name = name;
+	}
+	public String getAddress() {
+		return address;
+	}
+	public void setAddress(String address) {
+		this.address = address;
+	}
+}
+```
+
+That completes the `Message` class, however we need one more class to complete the picture. When you do a `GET` request on a collection in the Mail API, the results are returned as a page, with a maximum size. The returned messages are contained in a `value` field, and there are some other OData fields to support paging. So that Retrofit can properly deserialize the response, we need to model the JSON structure. We'll do this by creating a class in the `com.outlook.dev.service` package called `PagedResult`:
+
+```java
+package com.outlook.dev.service;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public class PagedResult<T> {
+	@JsonProperty("@odata.nextLink")
+	private String nextPageLink;
+	private T[] value;
+	
+	public String getNextPageLink() {
+		return nextPageLink;
+	}
+	public void setNextPageLink(String nextPageLink) {
+		this.nextPageLink = nextPageLink;
+	}
+	public T[] getValue() {
+		return value;
+	}
+	public void setValue(T[] value) {
+		this.value = value;
+	}
+}
+```
+
+Now that we have our classes defined, we can define an API declaration using Retrofit. Right-click the **com.outlook.dev.service** package and choose **New**, then **Interface**. Name the interface `OutlookService` and click **Finish**. Replace the entire contents of the `OutlookService.java` file with the following code:
+
+```java
+package com.outlook.dev.service;
+
+import retrofit2.Call;
+import retrofit2.http.GET;
+import retrofit2.http.Path;
+import retrofit2.http.Query;
+
+public interface OutlookService {
+
+	@GET("/api/v2.0/me/mailfolders/{folderid}/messages")
+	Call<PagedResult<Message>> getMessages(
+	  @Path("folderid") String folderId,
+	  @Query("$orderby") String orderBy,
+	  @Query("$select") String select,
+	  @Query("$top") Integer maxResults
+	);
+}
+```
+
+That defines the `getMessages` function, which returns a `PagedResult` class that contains `Message` objects. The parameters for it are:
+
+- `folderId`: Either the `Id` value of a folder, or one of the well-known folders, like `inbox` or `drafts`.
+- `orderBy`: A string that specifies the property to sort on and the direction, `DESC` or `ASC`.
+- `select`: A comma-separated list of properties to include in the results.
+- `maxResults`: The maximum number of items to return.
+
+Now that we have the service, let's create a new controller to use it. Right-click the **com.outlook.dev.controllers** package and choose **New**, then **Class**. Name the class `MailController` and click **Finish**. Replace the entire contents of the `MailController.java` file with the following code:
+
+```java
+package com.outlook.dev.controller;
+
+import java.io.IOException;
+import java.util.Date;
+import java.util.UUID;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.outlook.dev.auth.TokenResponse;
+import com.outlook.dev.service.Message;
+import com.outlook.dev.service.OutlookService;
+import com.outlook.dev.service.PagedResult;
+
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
+
+@Controller
+public class MailController {
+
+	@RequestMapping("/mail")
+	public String mail(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+		HttpSession session = request.getSession();
+		TokenResponse tokens = (TokenResponse)session.getAttribute("tokens");
+		if (tokens == null) {
+			// No tokens in session, user needs to sign in
+			redirectAttributes.addFlashAttribute("error", "Please sign in to continue.");
+			return "redirect:/index.html";
+		}
+		
+		Date now = new Date();
+		if (now.after(tokens.getExpirationTime())) {
+			// Token expired
+			// TODO: Use the refresh token to request a new token from the token endpoint
+			// For now, just complain
+			redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
+			return "redirect:/index.html";
+		}
+		
+		String email = (String)session.getAttribute("userEmail");
+		
+		OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+		
+		// Retrieve messages from the inbox
+		String folder = "inbox";
+		// Sort by time received in descending order
+		String sort = "ReceivedDateTime DESC";
+		// Only return the properties we care about
+		String properties = "ReceivedDateTime,From,IsRead,Subject,BodyPreview";
+		// Return at most 10 messages
+		Integer maxResults = 10;
+		
+		try {
+			PagedResult<Message> messages = outlookService.getMessages(
+					folder, sort, properties, maxResults)
+					.execute().body();
+			model.addAttribute("messages", messages.getValue());
+		} catch (IOException e) {
+			redirectAttributes.addAttribute("error", e.getMessage());
+			return "redirect:/index.html";
+		}
+		
+		return "mail";
+	}
+	
+	private OutlookService getOutlookService(String accessToken, String userEmail) {
+		// Create a request interceptor to add headers that belong on
+		// every request
+		Interceptor requestInterceptor = new Interceptor() {
+			@Override
+			public Response intercept(Interceptor.Chain chain) throws IOException {
+				Request original = chain.request();
+				
+				Request request = original.newBuilder()
+						.header("User-Agent", "java-tutorial")
+						.header("client-request-id", UUID.randomUUID().toString())
+						.header("return-client-request-id", "true")
+						.header("X-AnchorMailbox", userEmail)
+						.header("Authorization", String.format("Bearer %s", accessToken))
+						.method(original.method(), original.body())
+						.build();
+				
+				return chain.proceed(request);
+			}
+		};
+				
+		// Create a logging interceptor to log request and responses
+		HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
+		loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+		
+		OkHttpClient client = new OkHttpClient.Builder()
+				.addInterceptor(requestInterceptor)
+				.addInterceptor(loggingInterceptor)
+				.build();
+		
+		// Create and configure the Retrofit object
+		Retrofit retrofit = new Retrofit.Builder()
+				.baseUrl("https://outlook.office.com")
+				.client(client)
+				.addConverterFactory(JacksonConverterFactory.create())
+				.build();
+		
+		// Generate the token service
+		return retrofit.create(OutlookService.class);
+	}
+}
+```
+
+Now if you save all of your changes, restart the app, then login, you should end up on a rather empty-looking mail page. If you check the **Console** window in Spring Tool Suites, you should be able to verify that the API call worked by looking for the Retrofit logging entries. You should see something like this:
+
+```
+--> GET https://outlook.office.com/api/v2.0/me/mailfolders/inbox/messages?$orderby=ReceivedDateTime%20DESC&$select=ReceivedDateTime,From,IsRead,Subject,BodyPreview&$top=10 http/1.1
+User-Agent: java-tutorial
+client-request-id: 3d42cd86-f74b-40d9-9dd3-031de58fec0f
+return-client-request-id: true
+X-AnchorMailbox: AllieB@contoso.com
+Authorization: Bearer eyJ0eXAiOiJK...
+--> END GET
+```
+
+That should be followed by a `200 OK` line. If you scroll past the response headers, you should find a response body.
+
+## Displaying the results ##
+
+Now that we have a working API call, let's replace the current `mail.jsp` with something that can display our list of messages. The controller is already saving the array of `Message` objects into the `Model`, so we just need to access that in the JSP file. Open `mail.jsp` and replace the entire contents with the following code:
+
+```jsp
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+
+<c:if test="${error ne null}">
+	<div class="alert alert-danger">Error: ${error}</div>
+</c:if>
+
+<table class="table">
+	<caption>Inbox</caption>
+	<thead>
+		<tr>
+			<th><span class="glyphicon glyphicon-envelope"></span></th>
+			<th>From</th>
+			<th>Subject</th>
+			<th>Received</th>
+			<th>Preview</th>
+		</tr>
+	</thead>
+	<tbody>
+		<c:forEach items="${messages}" var="message">
+			<tr class="${message.isRead == true ? '' : 'info'}">
+				<td>
+					<c:if test="${message.isRead == false}">
+						<span class="glyphicon glyphicon-envelope"></span>
+					</c:if>
+				</td>
+				<td><c:out value="${message.from.emailAddress.name}" /></td>
+				<td><c:out value="${message.subject}" /></td>
+				<td><c:out value="${message.receivedDateTime}" /></td>
+				<td><c:out value="${message.bodyPreview}" /></td>
+			</tr>
+		</c:forEach>
+	</tbody>
+</table>
+```
+
+This uses the `forEach` tag from the JSTL core tag library to iterate through the array of messages and add a table row for each one. Unread messages get an envelope icon and their row highlighted.
+
+Save your changes and refresh the page. You should now see a table of messages.
+
+![](./readme-images/inbox-list.PNG)
 
 ## Next Steps ##
 
