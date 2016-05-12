@@ -13,6 +13,8 @@ public class Event {
 	private Recipient organizer;
 	@JsonProperty("Start")
 	private DateTimeTimeZone start;
+	@JsonProperty("End")
+	private DateTimeTimeZone end;
 	
 	public String getId() {
 		return id;
@@ -44,6 +46,4 @@ public class Event {
 	public void setEnd(DateTimeTimeZone end) {
 		this.end = end;
 	}
-	@JsonProperty("End")
-	private DateTimeTimeZone end;
 }

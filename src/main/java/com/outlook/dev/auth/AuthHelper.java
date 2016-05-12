@@ -23,7 +23,8 @@ public class AuthHelper {
 		"profile", 
 		"email", 
 		"https://outlook.office.com/mail.read",
-		"https://outlook.office.com/calendars.read"
+		"https://outlook.office.com/calendars.read",
+		"https://outlook.office.com/contacts.read"
 	};
 	
 	private static String appId = null;

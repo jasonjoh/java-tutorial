@@ -21,4 +21,11 @@ public interface OutlookService {
 	  @Query("$select") String select,
 	  @Query("$top") Integer maxResults
 	);
+	
+	@GET("/api/v2.0/me/contacts")
+	Call<PagedResult<Contact>> getContacts(
+		@Query("$orderby") String orderBy,
+	  @Query("$select") String select,
+	  @Query("$top") Integer maxResults
+	);
 }

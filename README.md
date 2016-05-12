@@ -1424,7 +1424,9 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
     private Recipient organizer;
     @JsonProperty("Start")
     private DateTimeTimeZone start;
-    
+    @JsonProperty("End")
+	  private DateTimeTimeZone end;
+  
     public String getId() {
       return id;
     }
@@ -1455,8 +1457,6 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
     public void setEnd(DateTimeTimeZone end) {
       this.end = end;
     }
-    @JsonProperty("End")
-    private DateTimeTimeZone end;
   }
   ```
 1. Create a class in the `com.outlook.dev.service` package for the [DateTimeTimeZone type](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#DateTimeTimeZoneV2).
@@ -1531,7 +1531,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
   public class EventsController {
 
     @RequestMapping("/events")
-    public String mail(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+    public String events(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
       HttpSession session = request.getSession();
       TokenResponse tokens = (TokenResponse)session.getAttribute("tokens");
       if (tokens == null) {
@@ -1557,7 +1557,7 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
       String sort = "Start/DateTime DESC";
       // Only return the properties we care about
       String properties = "Organizer,Subject,Start,End";
-      // Return at most 10 messages
+      // Return at most 10 events
       Integer maxResults = 10;
       
       try {
@@ -1663,6 +1663,246 @@ Now that you've mastered calling the Outlook Mail API, doing the same for Calend
 1. Restart the app.
 
 ### For Contacts API: ###
+
+1. Update the `scopes` array in `AuthHelper.java` to include the `Contacts.Read` scope.
+  ```java
+  private static String[] scopes = { 
+		"openid", 
+		"offline_access",
+		"profile", 
+		"email", 
+		"https://outlook.office.com/mail.read",
+		"https://outlook.office.com/calendars.read",
+    "https://outlook.office.com/contacts.read"
+	};
+  ```
+1. Create a class in the `com.outlook.dev.service` package for the [Contact entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesContact).
+  ```java
+  package com.outlook.dev.service;
+
+  import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+  import com.fasterxml.jackson.annotation.JsonProperty;
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public class Contact {
+    @JsonProperty("Id")
+    private String id;
+    @JsonProperty("GivenName")
+    private String givenName;
+    @JsonProperty("Surname")
+    private String surname;
+    @JsonProperty("CompanyName")
+    private String companyName;
+    @JsonProperty("EmailAddresses")
+    private EmailAddress[] emailAddresses;
+    
+    public String getId() {
+      return id;
+    }
+    public void setId(String id) {
+      this.id = id;
+    }
+    public String getGivenName() {
+      return givenName;
+    }
+    public void setGivenName(String givenName) {
+      this.givenName = givenName;
+    }
+    public String getSurname() {
+      return surname;
+    }
+    public void setSurname(String surname) {
+      this.surname = surname;
+    }
+    public String getCompanyName() {
+      return companyName;
+    }
+    public void setCompanyName(String companyName) {
+      this.companyName = companyName;
+    }
+    public EmailAddress[] getEmailAddresses() {
+      return emailAddresses;
+    }
+    public void setEmailAddresses(EmailAddress[] emailAddresses) {
+      this.emailAddresses = emailAddresses;
+    }
+  }
+  ```
+1. Add a `getContacts` function to the the `OutlookService` interface.
+  ```java
+  @GET("/api/v2.0/me/contacts")
+	Call<PagedResult<Contact>> getContacts(
+		@Query("$orderby") String orderBy,
+	  @Query("$select") String select,
+	  @Query("$top") Integer maxResults
+	);
+  ```
+1. Add a controller for viewing contacts to the `com.outlook.dev.controller` package.
+  ```java
+  package com.outlook.dev.controller;
+
+  import java.io.IOException;
+  import java.util.Date;
+  import java.util.UUID;
+
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpSession;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.ui.Model;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+  import com.outlook.dev.auth.TokenResponse;
+  import com.outlook.dev.service.Contact;
+  import com.outlook.dev.service.OutlookService;
+  import com.outlook.dev.service.PagedResult;
+
+  import okhttp3.Interceptor;
+  import okhttp3.OkHttpClient;
+  import okhttp3.Request;
+  import okhttp3.Response;
+  import okhttp3.logging.HttpLoggingInterceptor;
+  import retrofit2.Retrofit;
+  import retrofit2.converter.jackson.JacksonConverterFactory;
+
+  @Controller
+  public class ContactsController {
+    @RequestMapping("/contacts")
+    public String contacts(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+      HttpSession session = request.getSession();
+      TokenResponse tokens = (TokenResponse)session.getAttribute("tokens");
+      if (tokens == null) {
+        // No tokens in session, user needs to sign in
+        redirectAttributes.addFlashAttribute("error", "Please sign in to continue.");
+        return "redirect:/index.html";
+      }
+      
+      Date now = new Date();
+      if (now.after(tokens.getExpirationTime())) {
+        // Token expired
+        // TODO: Use the refresh token to request a new token from the token endpoint
+        // For now, just complain
+        redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
+        return "redirect:/index.html";
+      }
+      
+      String email = (String)session.getAttribute("userEmail");
+      
+      OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+      
+      // Sort by given name in ascending order (A-Z)
+      String sort = "GivenName ASC";
+      // Only return the properties we care about
+      String properties = "GivenName,Surname,CompanyName,EmailAddresses";
+      // Return at most 10 contacts
+      Integer maxResults = 10;
+      
+      try {
+        PagedResult<Contact> contacts = outlookService.getContacts(
+            sort, properties, maxResults)
+            .execute().body();
+        model.addAttribute("contacts", contacts.getValue());
+      } catch (IOException e) {
+        redirectAttributes.addFlashAttribute("error", e.getMessage());
+        return "redirect:/index.html";
+      }
+      
+      return "contacts";
+    }
+    
+    private OutlookService getOutlookService(String accessToken, String userEmail) {
+      // Create a request interceptor to add headers that belong on
+      // every request
+      Interceptor requestInterceptor = new Interceptor() {
+        @Override
+        public Response intercept(Interceptor.Chain chain) throws IOException {
+          Request original = chain.request();
+          
+          Request request = original.newBuilder()
+              .header("User-Agent", "java-tutorial")
+              .header("client-request-id", UUID.randomUUID().toString())
+              .header("return-client-request-id", "true")
+              .header("X-AnchorMailbox", userEmail)
+              .header("Authorization", String.format("Bearer %s", accessToken))
+              .method(original.method(), original.body())
+              .build();
+          
+          return chain.proceed(request);
+        }
+      };
+          
+      // Create a logging interceptor to log request and responses
+      HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
+      loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+      
+      OkHttpClient client = new OkHttpClient.Builder()
+          .addInterceptor(requestInterceptor)
+          .addInterceptor(loggingInterceptor)
+          .build();
+      
+      // Create and configure the Retrofit object
+      Retrofit retrofit = new Retrofit.Builder()
+          .baseUrl("https://outlook.office.com")
+          .client(client)
+          .addConverterFactory(JacksonConverterFactory.create())
+          .build();
+      
+      // Generate the token service
+      return retrofit.create(OutlookService.class);
+    }
+  }
+  ```
+1. Add `contacts.jsp` in the **jsp** folder.
+  ```jsp
+  <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+
+  <c:if test="${error ne null}">
+    <div class="alert alert-danger">Error: ${error}</div>
+  </c:if>
+
+  <table class="table">
+    <caption>Contacts</caption>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Company</th>
+        <th>Email</th>
+      </tr>
+    </thead>
+    <tbody>
+      <c:forEach items="${contacts}" var="contact">
+        <tr>
+          <td><c:out value="${contact.givenName} ${contact.surname}" /></td>
+          <td><c:out value="${contact.companyName}" /></td>
+          <td>
+            <ul class="list-inline">
+              <c:forEach items="${contact.emailAddresses}" var="address">
+                <li><c:out value="${address.address}" /></li>
+              </c:forEach>
+            </ul>
+          </td>
+        </tr>
+      </c:forEach>
+    </tbody>
+  </table>
+  ```
+1. Add a page definition for `events.jsp` in `pages.xml`.
+  ```xml
+  <definition name="contacts" extends="common">
+    <put-attribute name="title" value="My Contacts" />
+    <put-attribute name="body" value="/WEB-INF/jsp/contacts.jsp" />
+    <put-attribute name="current" value="contacts" />
+  </definition>
+  ```
+1. Add a nav bar entry for the events view in `base.jsp`.
+  ```jsp
+  <li class="${current == 'contacts' ? 'active' : '' }">
+    <a href="<spring:url value="/contacts.html" />">Contacts</a>
+  </li>
+  ```
+1. Restart the app.
 
 ## Next Steps ##
 

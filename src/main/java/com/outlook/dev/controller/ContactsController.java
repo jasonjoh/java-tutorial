@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.outlook.dev.auth.TokenResponse;
-import com.outlook.dev.service.Event;
+import com.outlook.dev.service.Contact;
 import com.outlook.dev.service.OutlookService;
 import com.outlook.dev.service.PagedResult;
 
@@ -26,10 +26,9 @@ import retrofit2.Retrofit;
 import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Controller
-public class EventsController {
-
-	@RequestMapping("/events")
-	public String events(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+public class ContactsController {
+	@RequestMapping("/contacts")
+	public String contacts(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
 		HttpSession session = request.getSession();
 		TokenResponse tokens = (TokenResponse)session.getAttribute("tokens");
 		if (tokens == null) {
@@ -51,18 +50,18 @@ public class EventsController {
 		
 		OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
 		
-		// Sort by start time in descending order
-		String sort = "Start/DateTime DESC";
+		// Sort by given name in ascending order (A-Z)
+		String sort = "GivenName ASC";
 		// Only return the properties we care about
-		String properties = "Organizer,Subject,Start,End";
-		// Return at most 10 events
+		String properties = "GivenName,Surname,CompanyName,EmailAddresses";
+		// Return at most 10 contacts
 		Integer maxResults = 10;
 		
 		try {
-			PagedResult<Event> events = outlookService.getEvents(
+			PagedResult<Contact> contacts = outlookService.getContacts(
 					sort, properties, maxResults)
 					.execute().body();
-			model.addAttribute("events", events.getValue());
+			model.addAttribute("contacts", contacts.getValue());
 		} catch (IOException e) {
 			redirectAttributes.addFlashAttribute("error", e.getMessage());
 			return "redirect:/index.html";

@@ -44,6 +44,9 @@
 							<li class="${current == 'events' ? 'active' : '' }">
 								<a href="<spring:url value="/events.html" />">Events</a>
 							</li>
+							<li class="${current == 'contacts' ? 'active' : '' }">
+								<a href="<spring:url value="/contacts.html" />">Contacts</a>
+							</li>
 						</c:if>
 					</ul>
 					<c:if test="${userConnected eq true}">
