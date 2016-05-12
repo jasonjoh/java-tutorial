@@ -22,7 +22,8 @@ public class AuthHelper {
 		"offline_access",
 		"profile", 
 		"email", 
-		"https://outlook.office.com/mail.read"
+		"https://outlook.office.com/mail.read",
+		"https://outlook.office.com/calendars.read"
 	};
 	
 	private static String appId = null;

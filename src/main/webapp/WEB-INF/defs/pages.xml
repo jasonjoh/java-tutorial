@@ -16,4 +16,10 @@
     <put-attribute name="body" value="/WEB-INF/jsp/mail.jsp" />
     <put-attribute name="current" value="mail" />
   </definition>
+  
+  <definition name="events" extends="common">
+    <put-attribute name="title" value="My Events" />
+    <put-attribute name="body" value="/WEB-INF/jsp/events.jsp" />
+    <put-attribute name="current" value="events" />
+  </definition>
 </tiles-definitions>

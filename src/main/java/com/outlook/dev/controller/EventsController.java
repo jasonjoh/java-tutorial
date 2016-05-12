@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.outlook.dev.auth.TokenResponse;
-import com.outlook.dev.service.Message;
+import com.outlook.dev.service.Event;
 import com.outlook.dev.service.OutlookService;
 import com.outlook.dev.service.PagedResult;
 
@@ -26,9 +26,9 @@ import retrofit2.Retrofit;
 import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Controller
-public class MailController {
+public class EventsController {
 
-	@RequestMapping("/mail")
+	@RequestMapping("/events")
 	public String mail(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
 		HttpSession session = request.getSession();
 		TokenResponse tokens = (TokenResponse)session.getAttribute("tokens");
@@ -51,26 +51,24 @@ public class MailController {
 		
 		OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
 		
-		// Retrieve messages from the inbox
-		String folder = "inbox";
-		// Sort by time received in descending order
-		String sort = "ReceivedDateTime DESC";
+		// Sort by start time in descending order
+		String sort = "Start/DateTime DESC";
 		// Only return the properties we care about
-		String properties = "ReceivedDateTime,From,IsRead,Subject,BodyPreview";
+		String properties = "Organizer,Subject,Start,End";
 		// Return at most 10 messages
 		Integer maxResults = 10;
 		
 		try {
-			PagedResult<Message> messages = outlookService.getMessages(
-					folder, sort, properties, maxResults)
+			PagedResult<Event> events = outlookService.getEvents(
+					sort, properties, maxResults)
 					.execute().body();
-			model.addAttribute("messages", messages.getValue());
+			model.addAttribute("events", events.getValue());
 		} catch (IOException e) {
 			redirectAttributes.addFlashAttribute("error", e.getMessage());
 			return "redirect:/index.html";
 		}
 		
-		return "mail";
+		return "events";
 	}
 	
 	private OutlookService getOutlookService(String accessToken, String userEmail) {

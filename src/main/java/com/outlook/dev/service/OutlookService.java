@@ -14,4 +14,11 @@ public interface OutlookService {
 	  @Query("$select") String select,
 	  @Query("$top") Integer maxResults
 	);
+	
+	@GET("/api/v2.0/me/events")
+	Call<PagedResult<Event>> getEvents(
+	  @Query("$orderby") String orderBy,
+	  @Query("$select") String select,
+	  @Query("$top") Integer maxResults
+	);
 }

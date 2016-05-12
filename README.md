@@ -240,7 +240,7 @@ Right-click the **WEB-INF** folder and choose **New**, then **Other**. In the li
 
 Click the **Namespaces** tab in the bottom toolbar. Select the `context` namespace, then click the **Source** tab.
 
-![](./readme-images/add-context-namespace.PNG)
+![The Namespaces tab in Spring Tool Suite](./readme-images/add-context-namespace.PNG)
 
 Add the following code inside the `<beans>` element:
 
@@ -378,7 +378,7 @@ public class IndexController {
 
 Save all of the files and restart the app. Now if you browse to http://localhost:8080, you should see the following:
 
-![](./readme-images/hello-world.PNG)
+![The app's home page showing "Hello World"](./readme-images/hello-world.PNG)
 
 Now that we have the environment ready, we're ready to start coding!
 
@@ -637,7 +637,7 @@ Open the `pages.xml` file (**Deployed Resources**, **webapp**, **WEB-INF**, **de
 
 Save all of your changes and restart the app. Browse to http://localhost:8080 and click the login button. Sign in with an Office 365 or Outlook.com account. Once you sign in and grant access to your information, the browser should redirect to the app, which displays the authorization code and ID token.
 
-![](./readme-images/auth-code.PNG)
+![The app's mail page showing the user's access token](./readme-images/auth-code.PNG)
 
 ### Exchanging the code for a token ###
 
@@ -1279,7 +1279,7 @@ public class MailController {
 					.execute().body();
 			model.addAttribute("messages", messages.getValue());
 		} catch (IOException e) {
-			redirectAttributes.addAttribute("error", e.getMessage());
+			redirectAttributes.addFlashAttribute("error", e.getMessage());
 			return "redirect:/index.html";
 		}
 		
@@ -1388,7 +1388,281 @@ This uses the `forEach` tag from the JSTL core tag library to iterate through th
 
 Save your changes and refresh the page. You should now see a table of messages.
 
-![](./readme-images/inbox-list.PNG)
+![The app's mail page showing a table of messages](./readme-images/inbox-list.PNG)
+
+## Adding Calendar and Contacts APIs ##
+
+Now that you've mastered calling the Outlook Mail API, doing the same for Calendar and Contacts APIs is similar and easy.
+
+### For Calendar API: ###
+
+1. Update the `scopes` array in `AuthHelper.java` to include the `Calendars.Read` scope.
+  ```java
+  private static String[] scopes = { 
+		"openid", 
+		"offline_access",
+		"profile", 
+		"email", 
+		"https://outlook.office.com/mail.read",
+		"https://outlook.office.com/calendars.read"
+	};
+  ```
+1. Create a class in the `com.outlook.dev.service` package for the [Event entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesEvent).
+  ```java
+  package com.outlook.dev.service;
+
+  import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+  import com.fasterxml.jackson.annotation.JsonProperty;
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public class Event {
+    @JsonProperty("Id")
+    private String id;
+    @JsonProperty("Subject")
+    private String subject;
+    @JsonProperty("Organizer")
+    private Recipient organizer;
+    @JsonProperty("Start")
+    private DateTimeTimeZone start;
+    
+    public String getId() {
+      return id;
+    }
+    public void setId(String id) {
+      this.id = id;
+    }
+    public String getSubject() {
+      return subject;
+    }
+    public void setSubject(String subject) {
+      this.subject = subject;
+    }
+    public Recipient getOrganizer() {
+      return organizer;
+    }
+    public void setOrganizer(Recipient organizer) {
+      this.organizer = organizer;
+    }
+    public DateTimeTimeZone getStart() {
+      return start;
+    }
+    public void setStart(DateTimeTimeZone start) {
+      this.start = start;
+    }
+    public DateTimeTimeZone getEnd() {
+      return end;
+    }
+    public void setEnd(DateTimeTimeZone end) {
+      this.end = end;
+    }
+    @JsonProperty("End")
+    private DateTimeTimeZone end;
+  }
+  ```
+1. Create a class in the `com.outlook.dev.service` package for the [DateTimeTimeZone type](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#DateTimeTimeZoneV2).
+  ```java
+  package com.outlook.dev.service;
+
+  import java.util.Date;
+
+  import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+  import com.fasterxml.jackson.annotation.JsonProperty;
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public class DateTimeTimeZone {
+    @JsonProperty("DateTime")
+    private Date dateTime;
+    @JsonProperty("TimeZone")
+    private String timeZone;
+    
+    public Date getDateTime() {
+      return dateTime;
+    }
+    public void setDateTime(Date dateTime) {
+      this.dateTime = dateTime;
+    }
+    public String getTimeZone() {
+      return timeZone;
+    }
+    public void setTimeZone(String timeZone) {
+      this.timeZone = timeZone;
+    }
+  }
+  ```
+1. Add a `getEvents` function to the the `OutlookService` interface.
+  ```java
+  @GET("/api/v2.0/me/events")
+	Call<PagedResult<Event>> getEvents(
+	  @Query("$orderby") String orderBy,
+	  @Query("$select") String select,
+	  @Query("$top") Integer maxResults
+	);
+  ```
+1. Add a controller for viewing events to the `com.outlook.dev.controller` package.
+  ```java
+  package com.outlook.dev.controller;
+
+  import java.io.IOException;
+  import java.util.Date;
+  import java.util.UUID;
+
+  import javax.servlet.http.HttpServletRequest;
+  import javax.servlet.http.HttpSession;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.ui.Model;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+  import com.outlook.dev.auth.TokenResponse;
+  import com.outlook.dev.service.Event;
+  import com.outlook.dev.service.OutlookService;
+  import com.outlook.dev.service.PagedResult;
+
+  import okhttp3.Interceptor;
+  import okhttp3.OkHttpClient;
+  import okhttp3.Request;
+  import okhttp3.Response;
+  import okhttp3.logging.HttpLoggingInterceptor;
+  import retrofit2.Retrofit;
+  import retrofit2.converter.jackson.JacksonConverterFactory;
+
+  @Controller
+  public class EventsController {
+
+    @RequestMapping("/events")
+    public String mail(Model model, HttpServletRequest request, RedirectAttributes redirectAttributes) {
+      HttpSession session = request.getSession();
+      TokenResponse tokens = (TokenResponse)session.getAttribute("tokens");
+      if (tokens == null) {
+        // No tokens in session, user needs to sign in
+        redirectAttributes.addFlashAttribute("error", "Please sign in to continue.");
+        return "redirect:/index.html";
+      }
+      
+      Date now = new Date();
+      if (now.after(tokens.getExpirationTime())) {
+        // Token expired
+        // TODO: Use the refresh token to request a new token from the token endpoint
+        // For now, just complain
+        redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
+        return "redirect:/index.html";
+      }
+      
+      String email = (String)session.getAttribute("userEmail");
+      
+      OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+      
+      // Sort by start time in descending order
+      String sort = "Start/DateTime DESC";
+      // Only return the properties we care about
+      String properties = "Organizer,Subject,Start,End";
+      // Return at most 10 messages
+      Integer maxResults = 10;
+      
+      try {
+        PagedResult<Event> events = outlookService.getEvents(
+            sort, properties, maxResults)
+            .execute().body();
+        model.addAttribute("events", events.getValue());
+      } catch (IOException e) {
+        redirectAttributes.addFlashAttribute("error", e.getMessage());
+        return "redirect:/index.html";
+      }
+      
+      return "events";
+    }
+    
+    private OutlookService getOutlookService(String accessToken, String userEmail) {
+      // Create a request interceptor to add headers that belong on
+      // every request
+      Interceptor requestInterceptor = new Interceptor() {
+        @Override
+        public Response intercept(Interceptor.Chain chain) throws IOException {
+          Request original = chain.request();
+          
+          Request request = original.newBuilder()
+              .header("User-Agent", "java-tutorial")
+              .header("client-request-id", UUID.randomUUID().toString())
+              .header("return-client-request-id", "true")
+              .header("X-AnchorMailbox", userEmail)
+              .header("Authorization", String.format("Bearer %s", accessToken))
+              .method(original.method(), original.body())
+              .build();
+          
+          return chain.proceed(request);
+        }
+      };
+          
+      // Create a logging interceptor to log request and responses
+      HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
+      loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+      
+      OkHttpClient client = new OkHttpClient.Builder()
+          .addInterceptor(requestInterceptor)
+          .addInterceptor(loggingInterceptor)
+          .build();
+      
+      // Create and configure the Retrofit object
+      Retrofit retrofit = new Retrofit.Builder()
+          .baseUrl("https://outlook.office.com")
+          .client(client)
+          .addConverterFactory(JacksonConverterFactory.create())
+          .build();
+      
+      // Generate the token service
+      return retrofit.create(OutlookService.class);
+    }
+  }
+  ```
+1. Add `events.jsp` in the **jsp** folder.
+  ```jsp
+  <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+
+  <c:if test="${error ne null}">
+    <div class="alert alert-danger">Error: ${error}</div>
+  </c:if>
+
+  <table class="table">
+    <caption>Calendar</caption>
+    <thead>
+      <tr>
+        <th>Organizer</th>
+        <th>Subject</th>
+        <th>Start</th>
+        <th>End</th>
+      </tr>
+    </thead>
+    <tbody>
+      <c:forEach items="${events}" var="event">
+        <tr>
+          <td><c:out value="${event.organizer.emailAddress.name}" /></td>
+          <td><c:out value="${event.subject}" /></td>
+          <td><c:out value="${event.start.dateTime}" /></td>
+          <td><c:out value="${event.end.dateTime}" /></td>
+        </tr>
+      </c:forEach>
+    </tbody>
+  </table>
+  ```
+1. Add a page definition for `events.jsp` in `pages.xml`.
+  ```xml
+  <definition name="events" extends="common">
+    <put-attribute name="title" value="My Events" />
+    <put-attribute name="body" value="/WEB-INF/jsp/events.jsp" />
+    <put-attribute name="current" value="events" />
+  </definition>
+  ```
+1. Add a nav bar entry for the events view in `base.jsp`.
+  ```jsp
+  <li class="${current == 'events' ? 'active' : '' }">
+    <a href="<spring:url value="/events.html" />">Events</a>
+  </li>
+  ```
+1. Restart the app.
+
+### For Contacts API: ###
 
 ## Next Steps ##
 
