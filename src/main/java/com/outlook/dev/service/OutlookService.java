@@ -6,6 +6,9 @@ import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface OutlookService {
+	
+	@GET("/api/v2.0/me")
+	Call<OutlookUser> getCurrentUser();
 
 	@GET("/api/v2.0/me/mailfolders/{folderid}/messages")
 	Call<PagedResult<Message>> getMessages(

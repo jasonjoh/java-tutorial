@@ -2,7 +2,6 @@ package com.outlook.dev.controller;
 
 import java.io.IOException;
 import java.util.Date;
-import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -15,15 +14,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.outlook.dev.auth.TokenResponse;
 import com.outlook.dev.service.Event;
 import com.outlook.dev.service.OutlookService;
+import com.outlook.dev.service.OutlookServiceBuilder;
 import com.outlook.dev.service.PagedResult;
-
-import okhttp3.Interceptor;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.logging.HttpLoggingInterceptor;
-import retrofit2.Retrofit;
-import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Controller
 public class EventsController {
@@ -49,7 +41,7 @@ public class EventsController {
 		
 		String email = (String)session.getAttribute("userEmail");
 		
-		OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+		OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokens.getAccessToken(), email);
 		
 		// Sort by start time in descending order
 		String sort = "Start/DateTime DESC";
@@ -68,47 +60,6 @@ public class EventsController {
 			return "redirect:/index.html";
 		}
 		
-		return "contacts";
-	}
-	
-	private OutlookService getOutlookService(String accessToken, String userEmail) {
-		// Create a request interceptor to add headers that belong on
-		// every request
-		Interceptor requestInterceptor = new Interceptor() {
-			@Override
-			public Response intercept(Interceptor.Chain chain) throws IOException {
-				Request original = chain.request();
-				
-				Request request = original.newBuilder()
-						.header("User-Agent", "java-tutorial")
-						.header("client-request-id", UUID.randomUUID().toString())
-						.header("return-client-request-id", "true")
-						.header("X-AnchorMailbox", userEmail)
-						.header("Authorization", String.format("Bearer %s", accessToken))
-						.method(original.method(), original.body())
-						.build();
-				
-				return chain.proceed(request);
-			}
-		};
-				
-		// Create a logging interceptor to log request and responses
-		HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-		loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-		
-		OkHttpClient client = new OkHttpClient.Builder()
-				.addInterceptor(requestInterceptor)
-				.addInterceptor(loggingInterceptor)
-				.build();
-		
-		// Create and configure the Retrofit object
-		Retrofit retrofit = new Retrofit.Builder()
-				.baseUrl("https://outlook.office.com")
-				.client(client)
-				.addConverterFactory(JacksonConverterFactory.create())
-				.build();
-		
-		// Generate the token service
-		return retrofit.create(OutlookService.class);
+		return "events";
 	}
 }

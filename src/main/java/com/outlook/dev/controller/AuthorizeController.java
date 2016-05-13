@@ -1,5 +1,6 @@
 package com.outlook.dev.controller;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
@@ -13,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.outlook.dev.auth.AuthHelper;
 import com.outlook.dev.auth.IdToken;
 import com.outlook.dev.auth.TokenResponse;
+import com.outlook.dev.service.OutlookService;
+import com.outlook.dev.service.OutlookServiceBuilder;
+import com.outlook.dev.service.OutlookUser;
 
 @Controller
 public class AuthorizeController {
@@ -39,12 +43,15 @@ public class AuthorizeController {
 				session.setAttribute("tokens", tokenResponse);
 				session.setAttribute("userConnected", true);
 				session.setAttribute("userName", idTokenObj.getName());
-				String email = idTokenObj.getEmail();
-				if (email == null || email.isEmpty()) {
-					// Office 365 users don't have the email claim
-					email = idTokenObj.getPreferredUsername();
+				// Get user info
+				OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokenResponse.getAccessToken(), null);
+				OutlookUser user;
+				try {
+					user = outlookService.getCurrentUser().execute().body();
+					session.setAttribute("userEmail", user.getEmailAddress());
+				} catch (IOException e) {
+					session.setAttribute("error", e.getMessage());
 				}
-				session.setAttribute("userEmail", email);
 			} else {
 				session.setAttribute("error", "ID token failed validation.");
 			}

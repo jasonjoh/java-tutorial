@@ -1010,12 +1010,6 @@ if (idTokenObj != null) {
   session.setAttribute("accessToken", tokenResponse.getAccessToken());
   session.setAttribute("userConnected", true);
   session.setAttribute("userName", idTokenObj.getName());
-  String email = idTokenObj.getEmail();
-  if (email == null || email.isEmpty()) {
-    // Office 365 users don't have the email claim
-    email = idTokenObj.getPreferredUsername();
-  }
-  session.setAttribute("userEmail", email);
 } else {
   session.setAttribute("error", "ID token failed validation.");
 }
@@ -1036,9 +1030,65 @@ Save all of your changes, restart the app, and browse to http://localhost:8080. 
 
 ## Using the Mail API ##
 
-Let's start by creating a class that represents a [Message entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesMessage). Our class won't cover every field present on a message, just the ones we will use in the app.
+Let's start by creating a class that represents a [User entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesUser). We'll use this to get the email address associated with the user's mailbox.
 
-Right-click the **src/main/java** folder and choose **New**, then **Package**. Name the package `com.outlook.dev.service` and click **Finish**. Right-click the **com.outlook.dev.service** package and choose **New**, then **Class**. Name the class `Message` and click **Finish**. Replace the entire contents of the `Message.java` file with the following code:
+Right-click the **src/main/java** folder and choose **New**, then **Package**. Name the package `com.outlook.dev.service` and click **Finish**. Right-click the **com.outlook.dev.service** package and choose **New**, then **Class**. Name the class `OutlookUser` and click **Finish**. Replace the entire contents of the `OutlookUser.java` file with the following code:
+
+```java
+package com.outlook.dev.service;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class OutlookUser {
+	@JsonProperty("Id")
+	private String id;
+	@JsonProperty("EmailAddress")
+	private String emailAddress;
+	@JsonProperty("DisplayName")
+	private String displayName;
+	@JsonProperty("Alias")
+	private String alias;
+	@JsonProperty("MailboxGuid")
+	private String mailboxGuid;
+	
+	public String getId() {
+		return id;
+	}
+	public void setId(String id) {
+		this.id = id;
+	}
+	public String getEmailAddress() {
+		return emailAddress;
+	}
+	public void setEmailAddress(String emailAddress) {
+		this.emailAddress = emailAddress;
+	}
+	public String getDisplayName() {
+		return displayName;
+	}
+	public void setDisplayName(String displayName) {
+		this.displayName = displayName;
+	}
+	public String getAlias() {
+		return alias;
+	}
+	public void setAlias(String alias) {
+		this.alias = alias;
+	}
+	public String getMailboxGuid() {
+		return mailboxGuid;
+	}
+	public void setMailboxGuid(String mailboxGuid) {
+		this.mailboxGuid = mailboxGuid;
+	}
+}
+```
+
+Next let's create a class that represents a [Message entity](https://msdn.microsoft.com/office/office365/api/complex-types-for-mail-contacts-calendar#RESTAPIResourcesMessage). Our class won't cover every field present on a message, just the ones we will use in the app.
+
+Right-click the **com.outlook.dev.service** package and choose **New**, then **Class**. Name the class `Message` and click **Finish**. Replace the entire contents of the `Message.java` file with the following code:
 
 ```java
 package com.outlook.dev.service;
@@ -1190,6 +1240,9 @@ import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface OutlookService {
+  
+  @GET("/api/v2.0/me")
+	Call<OutlookUser> getCurrentUser();
 
 	@GET("/api/v2.0/me/mailfolders/{folderid}/messages")
 	Call<PagedResult<Message>> getMessages(
@@ -1201,12 +1254,76 @@ public interface OutlookService {
 }
 ```
 
-That defines the `getMessages` function, which returns a `PagedResult` class that contains `Message` objects. The parameters for it are:
+That defines the `getCurrentUser` and `getMessages` functions. The `getCurrentUser` function takes now parameters and returns an `OutlookUser` object. The `getMessages` function returns a `PagedResult` class that contains `Message` objects. The parameters for it are:
 
 - `folderId`: Either the `Id` value of a folder, or one of the well-known folders, like `inbox` or `drafts`.
 - `orderBy`: A string that specifies the property to sort on and the direction, `DESC` or `ASC`.
 - `select`: A comma-separated list of properties to include in the results.
 - `maxResults`: The maximum number of items to return.
+
+To make it easy to use this service, let's create a builder class to instantiate an `OutlookService` object. Create a new class in the `com.outlook.dev.service` package named `OutlookServiceBuilder`. Replace the entire contents of the`OutlookServiceBuilder.java` file with the following code:
+
+```java
+package com.outlook.dev.service;
+
+import java.io.IOException;
+import java.util.UUID;
+
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Request.Builder;
+import okhttp3.Response;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.jackson.JacksonConverterFactory;
+
+public class OutlookServiceBuilder {
+
+	public static OutlookService getOutlookService(String accessToken, String userEmail) {
+		// Create a request interceptor to add headers that belong on
+		// every request
+		Interceptor requestInterceptor = new Interceptor() {
+			@Override
+			public Response intercept(Interceptor.Chain chain) throws IOException {
+				Request original = chain.request();
+				Builder builder = original.newBuilder()
+						.header("User-Agent", "java-tutorial")
+						.header("client-request-id", UUID.randomUUID().toString())
+						.header("return-client-request-id", "true")
+						.header("Authorization", String.format("Bearer %s", accessToken))
+						.method(original.method(), original.body());
+				
+				if (userEmail != null && !userEmail.isEmpty()) {
+					builder = builder.header("X-AnchorMailbox", userEmail);
+				}
+				
+				Request request = builder.build();
+				return chain.proceed(request);
+			}
+		};
+				
+		// Create a logging interceptor to log request and responses
+		HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
+		loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+		
+		OkHttpClient client = new OkHttpClient.Builder()
+				.addInterceptor(requestInterceptor)
+				.addInterceptor(loggingInterceptor)
+				.build();
+		
+		// Create and configure the Retrofit object
+		Retrofit retrofit = new Retrofit.Builder()
+				.baseUrl("https://outlook.office.com")
+				.client(client)
+				.addConverterFactory(JacksonConverterFactory.create())
+				.build();
+		
+		// Generate the token service
+		return retrofit.create(OutlookService.class);
+	}
+}
+```
 
 Now that we have the service, let's create a new controller to use it. Right-click the **com.outlook.dev.controllers** package and choose **New**, then **Class**. Name the class `MailController` and click **Finish**. Replace the entire contents of the `MailController.java` file with the following code:
 
@@ -1215,7 +1332,6 @@ package com.outlook.dev.controller;
 
 import java.io.IOException;
 import java.util.Date;
-import java.util.UUID;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -1228,15 +1344,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.outlook.dev.auth.TokenResponse;
 import com.outlook.dev.service.Message;
 import com.outlook.dev.service.OutlookService;
+import com.outlook.dev.service.OutlookServiceBuilder;
 import com.outlook.dev.service.PagedResult;
-
-import okhttp3.Interceptor;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.logging.HttpLoggingInterceptor;
-import retrofit2.Retrofit;
-import retrofit2.converter.jackson.JacksonConverterFactory;
 
 @Controller
 public class MailController {
@@ -1262,7 +1371,7 @@ public class MailController {
 		
 		String email = (String)session.getAttribute("userEmail");
 		
-		OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+		OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokens.getAccessToken(), email);
 		
 		// Retrieve messages from the inbox
 		String folder = "inbox";
@@ -1285,47 +1394,20 @@ public class MailController {
 		
 		return "mail";
 	}
-	
-	private OutlookService getOutlookService(String accessToken, String userEmail) {
-		// Create a request interceptor to add headers that belong on
-		// every request
-		Interceptor requestInterceptor = new Interceptor() {
-			@Override
-			public Response intercept(Interceptor.Chain chain) throws IOException {
-				Request original = chain.request();
-				
-				Request request = original.newBuilder()
-						.header("User-Agent", "java-tutorial")
-						.header("client-request-id", UUID.randomUUID().toString())
-						.header("return-client-request-id", "true")
-						.header("X-AnchorMailbox", userEmail)
-						.header("Authorization", String.format("Bearer %s", accessToken))
-						.method(original.method(), original.body())
-						.build();
-				
-				return chain.proceed(request);
-			}
-		};
-				
-		// Create a logging interceptor to log request and responses
-		HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-		loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-		
-		OkHttpClient client = new OkHttpClient.Builder()
-				.addInterceptor(requestInterceptor)
-				.addInterceptor(loggingInterceptor)
-				.build();
-		
-		// Create and configure the Retrofit object
-		Retrofit retrofit = new Retrofit.Builder()
-				.baseUrl("https://outlook.office.com")
-				.client(client)
-				.addConverterFactory(JacksonConverterFactory.create())
-				.build();
-		
-		// Generate the token service
-		return retrofit.create(OutlookService.class);
-	}
+}
+```
+
+Let's also update the `AuthorizeController` to use the service to get the user's email address. Add the following code to the `authorize` method in `AuthorizeController.java`, immediately after the `session.setAttribute("userName", idTokenObj.getName());` line:
+
+```java
+// Get user info
+OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokenResponse.getAccessToken(), null);
+OutlookUser user;
+try {
+  user = outlookService.getCurrentUser().execute().body();
+  session.setAttribute("userEmail", user.getEmailAddress());
+} catch (IOException e) {
+  session.setAttribute("error", e.getMessage());
 }
 ```
 
@@ -1506,7 +1588,6 @@ Call<PagedResult<Event>> getEvents(
 
   import java.io.IOException;
   import java.util.Date;
-  import java.util.UUID;
 
   import javax.servlet.http.HttpServletRequest;
   import javax.servlet.http.HttpSession;
@@ -1519,15 +1600,8 @@ Call<PagedResult<Event>> getEvents(
   import com.outlook.dev.auth.TokenResponse;
   import com.outlook.dev.service.Event;
   import com.outlook.dev.service.OutlookService;
+  import com.outlook.dev.service.OutlookServiceBuilder;
   import com.outlook.dev.service.PagedResult;
-
-  import okhttp3.Interceptor;
-  import okhttp3.OkHttpClient;
-  import okhttp3.Request;
-  import okhttp3.Response;
-  import okhttp3.logging.HttpLoggingInterceptor;
-  import retrofit2.Retrofit;
-  import retrofit2.converter.jackson.JacksonConverterFactory;
 
   @Controller
   public class EventsController {
@@ -1553,7 +1627,7 @@ Call<PagedResult<Event>> getEvents(
       
       String email = (String)session.getAttribute("userEmail");
       
-      OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+      OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokens.getAccessToken(), email);
       
       // Sort by start time in descending order
       String sort = "Start/DateTime DESC";
@@ -1573,47 +1647,6 @@ Call<PagedResult<Event>> getEvents(
       }
       
       return "events";
-    }
-    
-    private OutlookService getOutlookService(String accessToken, String userEmail) {
-      // Create a request interceptor to add headers that belong on
-      // every request
-      Interceptor requestInterceptor = new Interceptor() {
-        @Override
-        public Response intercept(Interceptor.Chain chain) throws IOException {
-          Request original = chain.request();
-          
-          Request request = original.newBuilder()
-              .header("User-Agent", "java-tutorial")
-              .header("client-request-id", UUID.randomUUID().toString())
-              .header("return-client-request-id", "true")
-              .header("X-AnchorMailbox", userEmail)
-              .header("Authorization", String.format("Bearer %s", accessToken))
-              .method(original.method(), original.body())
-              .build();
-          
-          return chain.proceed(request);
-        }
-      };
-          
-      // Create a logging interceptor to log request and responses
-      HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-      loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-      
-      OkHttpClient client = new OkHttpClient.Builder()
-          .addInterceptor(requestInterceptor)
-          .addInterceptor(loggingInterceptor)
-          .build();
-      
-      // Create and configure the Retrofit object
-      Retrofit retrofit = new Retrofit.Builder()
-          .baseUrl("https://outlook.office.com")
-          .client(client)
-          .addConverterFactory(JacksonConverterFactory.create())
-          .build();
-      
-      // Generate the token service
-      return retrofit.create(OutlookService.class);
     }
   }
   ```
@@ -1749,7 +1782,6 @@ Call<PagedResult<Contact>> getContacts(
 
   import java.io.IOException;
   import java.util.Date;
-  import java.util.UUID;
 
   import javax.servlet.http.HttpServletRequest;
   import javax.servlet.http.HttpSession;
@@ -1762,15 +1794,8 @@ Call<PagedResult<Contact>> getContacts(
   import com.outlook.dev.auth.TokenResponse;
   import com.outlook.dev.service.Contact;
   import com.outlook.dev.service.OutlookService;
+  import com.outlook.dev.service.OutlookServiceBuilder;
   import com.outlook.dev.service.PagedResult;
-
-  import okhttp3.Interceptor;
-  import okhttp3.OkHttpClient;
-  import okhttp3.Request;
-  import okhttp3.Response;
-  import okhttp3.logging.HttpLoggingInterceptor;
-  import retrofit2.Retrofit;
-  import retrofit2.converter.jackson.JacksonConverterFactory;
 
   @Controller
   public class ContactsController {
@@ -1795,7 +1820,7 @@ Call<PagedResult<Contact>> getContacts(
       
       String email = (String)session.getAttribute("userEmail");
       
-      OutlookService outlookService = getOutlookService(tokens.getAccessToken(), email);
+      OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokens.getAccessToken(), email);
       
       // Sort by given name in ascending order (A-Z)
       String sort = "GivenName ASC";
@@ -1815,47 +1840,6 @@ Call<PagedResult<Contact>> getContacts(
       }
       
       return "contacts";
-    }
-    
-    private OutlookService getOutlookService(String accessToken, String userEmail) {
-      // Create a request interceptor to add headers that belong on
-      // every request
-      Interceptor requestInterceptor = new Interceptor() {
-        @Override
-        public Response intercept(Interceptor.Chain chain) throws IOException {
-          Request original = chain.request();
-          
-          Request request = original.newBuilder()
-              .header("User-Agent", "java-tutorial")
-              .header("client-request-id", UUID.randomUUID().toString())
-              .header("return-client-request-id", "true")
-              .header("X-AnchorMailbox", userEmail)
-              .header("Authorization", String.format("Bearer %s", accessToken))
-              .method(original.method(), original.body())
-              .build();
-          
-          return chain.proceed(request);
-        }
-      };
-          
-      // Create a logging interceptor to log request and responses
-      HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor();
-      loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-      
-      OkHttpClient client = new OkHttpClient.Builder()
-          .addInterceptor(requestInterceptor)
-          .addInterceptor(loggingInterceptor)
-          .build();
-      
-      // Create and configure the Retrofit object
-      Retrofit retrofit = new Retrofit.Builder()
-          .baseUrl("https://outlook.office.com")
-          .client(client)
-          .addConverterFactory(JacksonConverterFactory.create())
-          .build();
-      
-      // Generate the token service
-      return retrofit.create(OutlookService.class);
     }
   }
   ```
