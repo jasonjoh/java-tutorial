@@ -507,6 +507,7 @@ public class AuthHelper {
 				authProps.load(authConfigStream);
 				appId = authProps.getProperty("appId");
 				appPassword = authProps.getProperty("appPassword");
+				redirectUrl = authProps.getProperty("redirectUrl");
 			} finally {
 				authConfigStream.close();
 			}
@@ -584,9 +585,9 @@ public class AuthorizeController {
 	@RequestMapping(value="/authorize", method=RequestMethod.POST)
 	public String authorize(
 			@RequestParam("code") String code, 
+			@RequestParam("id_token") String idToken,
 			@RequestParam("state") UUID state,
-			HttpServletRequest request,
-			RedirectAttributes redirectAttributes) {
+			HttpServletRequest request) { {
 		// Get the expected state value from the session
 		HttpSession session = request.getSession();
 		UUID expectedState = (UUID) session.getAttribute("expected_state");
