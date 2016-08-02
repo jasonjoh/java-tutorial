@@ -3,6 +3,7 @@ package com.outlook.dev.auth;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Calendar;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -130,6 +131,44 @@ public class AuthHelper {
 			error.setError("IOException");
 			error.setErrorDescription(e.getMessage());
 			return error;
+		}
+	}
+	 
+	public static TokenResponse ensureTokens(TokenResponse tokens, String tenantId) {
+		// Are tokens still valid?
+		Calendar now = Calendar.getInstance();
+		if (now.getTime().after(tokens.getExpirationTime())) {
+			// Still valid, return them as-is
+			return tokens;
+		}
+		else {
+			// Expired, refresh the tokens
+			// Create a logging interceptor to log request and responses
+			HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
+			interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+			
+			OkHttpClient client = new OkHttpClient.Builder()
+					.addInterceptor(interceptor).build();
+			
+			// Create and configure the Retrofit object
+			Retrofit retrofit = new Retrofit.Builder()
+					.baseUrl(authority)
+					.client(client)
+					.addConverterFactory(JacksonConverterFactory.create())
+					.build();
+			
+			// Generate the token service
+			TokenService tokenService = retrofit.create(TokenService.class);
+			
+			try {
+				return tokenService.getAccessTokenFromRefreshToken(tenantId, getAppId(), getAppPassword(), 
+						"refresh_token", tokens.getRefreshToken(), getRedirectUrl()).execute().body();
+			} catch (IOException e) {
+				TokenResponse error = new TokenResponse();
+				error.setError("IOException");
+				error.setErrorDescription(e.getMessage());
+				return error;
+			}
 		}
 	}
 }

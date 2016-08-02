@@ -1011,6 +1011,7 @@ if (idTokenObj != null) {
   session.setAttribute("accessToken", tokenResponse.getAccessToken());
   session.setAttribute("userConnected", true);
   session.setAttribute("userName", idTokenObj.getName());
+  session.setAttribute("userTenantId", idTokenObj.getTenantId());
 } else {
   session.setAttribute("error", "ID token failed validation.");
 }
@@ -1027,7 +1028,72 @@ public String logout(HttpServletRequest request) {
 }
 ```
 
-Save all of your changes, restart the app, and browse to http://localhost:8080. This time if you log in, you should see an access token. Now that we can retrive the access token, we're ready to call the Mail API.
+Save all of your changes, restart the app, and browse to http://localhost:8080. This time if you log in, you should see an access token. 
+
+### Refreshing the access token
+
+Access tokens returned from Azure are valid for an hour. If you use the token after it has expired, the API calls will return 401 errors. You could ask the user to sign in again, but the better option is to refresh the token silently.
+
+In order to do that, the app must request the `offline_access` scope. We're already requesting that scope, so we don't need to change anything there.
+
+Let's add a function to the `TokenService` interface to refresh the access token. Open the `TokenService.java` file and add the following function.
+
+```java
+@FormUrlEncoded
+@POST("/{tenantid}/oauth2/v2.0/token")
+Call<TokenResponse> getAccessTokenFromRefreshToken(
+  @Path("tenantid") String tenantId,
+  @Field("client_id") String clientId,
+  @Field("client_secret") String clientSecret,
+  @Field("grant_type") String grantType,
+  @Field("refresh_token") String code,
+  @Field("redirect_uri") String redirectUrl
+);
+```
+
+Now let's add a function to `AuthHelper` to check our current token and refresh it if expired.
+
+```java
+public static TokenResponse ensureTokens(TokenResponse tokens, String tenantId) {
+  // Are tokens still valid?
+  Calendar now = Calendar.getInstance();
+  if (now.getTime().before(tokens.getExpirationTime())) {
+    // Still valid, return them as-is
+    return tokens;
+  }
+  else {
+    // Expired, refresh the tokens
+    // Create a logging interceptor to log request and responses
+    HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
+    interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
+    
+    OkHttpClient client = new OkHttpClient.Builder()
+        .addInterceptor(interceptor).build();
+    
+    // Create and configure the Retrofit object
+    Retrofit retrofit = new Retrofit.Builder()
+        .baseUrl(authority)
+        .client(client)
+        .addConverterFactory(JacksonConverterFactory.create())
+        .build();
+    
+    // Generate the token service
+    TokenService tokenService = retrofit.create(TokenService.class);
+    
+    try {
+      return tokenService.getAccessTokenFromRefreshToken(tenantId, getAppId(), getAppPassword(), 
+          "refresh_token", tokens.getRefreshToken(), getRedirectUrl()).execute().body();
+    } catch (IOException e) {
+      TokenResponse error = new TokenResponse();
+      error.setError("IOException");
+      error.setErrorDescription(e.getMessage());
+      return error;
+    }
+  }
+}
+```
+
+Now that we can retrive the access token, we're ready to call the Mail API.
 
 ## Using the Mail API ##
 
@@ -1342,6 +1408,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.outlook.dev.auth.AuthHelper;
 import com.outlook.dev.auth.TokenResponse;
 import com.outlook.dev.service.Message;
 import com.outlook.dev.service.OutlookService;
@@ -1361,14 +1428,9 @@ public class MailController {
 			return "redirect:/index.html";
 		}
 		
-		Date now = new Date();
-		if (now.after(tokens.getExpirationTime())) {
-			// Token expired
-			// TODO: Use the refresh token to request a new token from the token endpoint
-			// For now, just complain
-			redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
-			return "redirect:/index.html";
-		}
+		String tenantId = (String)session.getAttribute("userTenantId");
+		
+		tokens = AuthHelper.ensureTokens(tokens, tenantId);
 		
 		String email = (String)session.getAttribute("userEmail");
 		
@@ -1598,6 +1660,7 @@ Call<PagedResult<Event>> getEvents(
   import org.springframework.web.bind.annotation.RequestMapping;
   import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+  import com.outlook.dev.auth.AuthHelper;
   import com.outlook.dev.auth.TokenResponse;
   import com.outlook.dev.service.Event;
   import com.outlook.dev.service.OutlookService;
@@ -1617,14 +1680,9 @@ Call<PagedResult<Event>> getEvents(
         return "redirect:/index.html";
       }
       
-      Date now = new Date();
-      if (now.after(tokens.getExpirationTime())) {
-        // Token expired
-        // TODO: Use the refresh token to request a new token from the token endpoint
-        // For now, just complain
-        redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
-        return "redirect:/index.html";
-      }
+      String tenantId = (String)session.getAttribute("userTenantId");
+		
+		  tokens = AuthHelper.ensureTokens(tokens, tenantId);
       
       String email = (String)session.getAttribute("userEmail");
       
@@ -1792,6 +1850,7 @@ Call<PagedResult<Contact>> getContacts(
   import org.springframework.web.bind.annotation.RequestMapping;
   import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+  import com.outlook.dev.auth.AuthHelper;
   import com.outlook.dev.auth.TokenResponse;
   import com.outlook.dev.service.Contact;
   import com.outlook.dev.service.OutlookService;
@@ -1810,14 +1869,9 @@ Call<PagedResult<Contact>> getContacts(
         return "redirect:/index.html";
       }
       
-      Date now = new Date();
-      if (now.after(tokens.getExpirationTime())) {
-        // Token expired
-        // TODO: Use the refresh token to request a new token from the token endpoint
-        // For now, just complain
-        redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
-        return "redirect:/index.html";
-      }
+      String tenantId = (String)session.getAttribute("userTenantId");
+		
+		  tokens = AuthHelper.ensureTokens(tokens, tenantId);
       
       String email = (String)session.getAttribute("userEmail");
       

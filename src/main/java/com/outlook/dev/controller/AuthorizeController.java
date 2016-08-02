@@ -43,6 +43,7 @@ public class AuthorizeController {
 				session.setAttribute("tokens", tokenResponse);
 				session.setAttribute("userConnected", true);
 				session.setAttribute("userName", idTokenObj.getName());
+				session.setAttribute("userTenantId", idTokenObj.getTenantId());
 				// Get user info
 				OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokenResponse.getAccessToken(), null);
 				OutlookUser user;
