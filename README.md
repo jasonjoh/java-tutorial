@@ -31,7 +31,7 @@ In Spring Tool Suite, on the **File** menu, choose **New**, then **Other**. In t
 
 Check the **Create a simple project (skip archetype selection)** checkbox and click **Next**.
 
-Enter 'com.outlook.dev' for **Group Id**, and `java-tutorial` for **Artifact Id**. Change **Packaging** to `war`. Click **Finish**.
+Enter `com.outlook.dev` for **Group Id**, and `java-tutorial` for **Artifact Id**. Change **Packaging** to `war`. Click **Finish**.
 
 ![The New Maven project dialog in Spring Tool Suite](./readme-images/new-maven-project.PNG)
 
@@ -88,7 +88,7 @@ Now let's make sure it works. Right-click the project and choose **Run as**, the
 
 ### Add Spring and Apache Tiles ###
 
-Now let's add the [Spring Framework](http://projects.spring.io/spring-framework/) and [Apache Tiles](http://tiles.apache.org/). The Spring Framework will simplify our web app development and give us and MVC-based environment, and Apache Tiles will enable our pages to reuse a standard layout.
+Now let's add the [Spring Framework](http://projects.spring.io/spring-framework/) and [Apache Tiles](http://tiles.apache.org/). The Spring Framework will simplify our web app development and give us an MVC-based environment, and Apache Tiles will enable our pages to reuse a standard layout.
 
 In `pom.xml`, add the following lines after the `</build>` line:
 
@@ -407,7 +407,7 @@ Now we have a login button. It doesn't do anything yet, but that's about to chan
 
 ## Implementing OAuth2 ##
 
-Our goal in this section is to make the link on our home page initiate the [OAuth2 Authorization Code Grant flow with Azure AD](https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx). To make things easier, we'll use the [Microsoft.Experimental.IdentityModel.Clients.ActiveDirectory Prerelease NuGet package](https://www.nuget.org/packages/Microsoft.Experimental.IdentityModel.Clients.ActiveDirectory/4.0.208020147-alpha) to handle our OAuth requests.
+Our goal in this section is to make the link on our home page initiate the [OAuth2 Authorization Code Grant flow with Azure AD](https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx).
 
 Before we proceed, we need to register our app to obtain a client ID and secret. Head over to https://apps.dev.microsoft.com to quickly get a client ID and secret. Using the sign in buttons, sign in with either your Microsoft account (Outlook.com), or your work or school account (Office 365).
 
