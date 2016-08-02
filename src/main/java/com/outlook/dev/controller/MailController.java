@@ -1,7 +1,6 @@
 package com.outlook.dev.controller;
 
 import java.io.IOException;
-import java.util.Date;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -11,6 +10,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.outlook.dev.auth.AuthHelper;
 import com.outlook.dev.auth.TokenResponse;
 import com.outlook.dev.service.Message;
 import com.outlook.dev.service.OutlookService;
@@ -30,14 +30,9 @@ public class MailController {
 			return "redirect:/index.html";
 		}
 		
-		Date now = new Date();
-		if (now.after(tokens.getExpirationTime())) {
-			// Token expired
-			// TODO: Use the refresh token to request a new token from the token endpoint
-			// For now, just complain
-			redirectAttributes.addFlashAttribute("error", "The access token has expired. Please logout and re-login.");
-			return "redirect:/index.html";
-		}
+		String tenantId = (String)session.getAttribute("userTenantId");
+		
+		tokens = AuthHelper.ensureTokens(tokens, tenantId);
 		
 		String email = (String)session.getAttribute("userEmail");
 		
