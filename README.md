@@ -415,7 +415,7 @@ Once you're signed in, click the **Add an app** button. Enter `java-tutorial` fo
 
 ![The new password dialog.](./readme-images/new-password.PNG)
 
-Locate the **Platforms** section, and click **Add Platform**. Choose **Web**, then enter `http://localhost:8080/authorize` under **Redirect URIs**. Click **Save** to complete the registration. Copy the **Application Id** and save it along with the password you copied earlier. We'll need those values soon.
+Locate the **Platforms** section, and click **Add Platform**. Choose **Web**, then enter `http://localhost:8080/authorize.html` under **Redirect URIs**. Click **Save** to complete the registration. Copy the **Application Id** and save it along with the password you copied earlier. We'll need those values soon.
 
 Here's what the details of your app registration should look like when you are done.
 
@@ -426,7 +426,7 @@ In **Project Explorer**, expand **Java Resources**. Right-click **src/main/resou
 ```INI
 appId=YOUR_APP_ID_HERE
 appPassword=YOUR_APP_PASSWORD_HERE
-redirectUrl=http://localhost:8080/authorize
+redirectUrl=http://localhost:8080/authorize.html
 ```
 
 Now let's create a class to handle the authentication work. Right-click the project and choose **New**, then **Class**. Change the value of **Package** to `com.outlook.dev.auth`, and name the class `AuthHelper`, then click **Finish**. Replace the entire contents of the `AuthHelper.java` file with the following code:
