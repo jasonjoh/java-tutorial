@@ -22,9 +22,10 @@ public class AuthHelper {
 		"openid", 
 		"offline_access",
 		"profile", 
-		"https://outlook.office.com/mail.read",
-		"https://outlook.office.com/calendars.read",
-		"https://outlook.office.com/contacts.read"
+		"User.Read",
+		"Mail.Read",
+		"Calendars.Read",
+		"Contacts.Read"
 	};
 	
 	private static String appId = null;

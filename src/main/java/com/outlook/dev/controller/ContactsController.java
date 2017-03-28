@@ -43,9 +43,9 @@ public class ContactsController {
 		OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokens.getAccessToken(), email);
 		
 		// Sort by given name in ascending order (A-Z)
-		String sort = "GivenName ASC";
+		String sort = "givenName ASC";
 		// Only return the properties we care about
-		String properties = "GivenName,Surname,CompanyName,EmailAddresses";
+		String properties = "givenName,surname,companyName,emailAddresses";
 		// Return at most 10 contacts
 		Integer maxResults = 10;
 		

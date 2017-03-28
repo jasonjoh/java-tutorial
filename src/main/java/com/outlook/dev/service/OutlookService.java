@@ -7,10 +7,10 @@ import retrofit2.http.Query;
 
 public interface OutlookService {
 	
-	@GET("/api/v2.0/me")
+	@GET("/v1.0/me")
 	Call<OutlookUser> getCurrentUser();
 
-	@GET("/api/v2.0/me/mailfolders/{folderid}/messages")
+	@GET("/v1.0/me/mailfolders/{folderid}/messages")
 	Call<PagedResult<Message>> getMessages(
 	  @Path("folderid") String folderId,
 	  @Query("$orderby") String orderBy,
@@ -18,14 +18,14 @@ public interface OutlookService {
 	  @Query("$top") Integer maxResults
 	);
 	
-	@GET("/api/v2.0/me/events")
+	@GET("/v1.0/me/events")
 	Call<PagedResult<Event>> getEvents(
 	  @Query("$orderby") String orderBy,
 	  @Query("$select") String select,
 	  @Query("$top") Integer maxResults
 	);
 	
-	@GET("/api/v2.0/me/contacts")
+	@GET("/v1.0/me/contacts")
 	Call<PagedResult<Contact>> getContacts(
 		@Query("$orderby") String orderBy,
 	  @Query("$select") String select,

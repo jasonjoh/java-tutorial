@@ -3,21 +3,14 @@ package com.outlook.dev.service;
 import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Message {
-	@JsonProperty("Id")
 	private String id;
-	@JsonProperty("ReceivedDateTime")
 	private Date receivedDateTime;
-	@JsonProperty("From")
 	private Recipient from;
-	@JsonProperty("IsRead")
 	private Boolean isRead;
-	@JsonProperty("Subject")
 	private String subject;
-	@JsonProperty("BodyPreview")
 	private String bodyPreview;
 	
 	public String getId() {

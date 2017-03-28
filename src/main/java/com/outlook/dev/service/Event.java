@@ -1,19 +1,13 @@
 package com.outlook.dev.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Event {
-	@JsonProperty("Id")
 	private String id;
-	@JsonProperty("Subject")
 	private String subject;
-	@JsonProperty("Organizer")
 	private Recipient organizer;
-	@JsonProperty("Start")
 	private DateTimeTimeZone start;
-	@JsonProperty("End")
 	private DateTimeTimeZone end;
 	
 	public String getId() {

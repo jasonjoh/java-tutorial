@@ -48,7 +48,7 @@ public class OutlookServiceBuilder {
 		
 		// Create and configure the Retrofit object
 		Retrofit retrofit = new Retrofit.Builder()
-				.baseUrl("https://outlook.office.com")
+				.baseUrl("https://graph.microsoft.com")
 				.client(client)
 				.addConverterFactory(JacksonConverterFactory.create())
 				.build();

@@ -44,9 +44,9 @@ public class EventsController {
 		OutlookService outlookService = OutlookServiceBuilder.getOutlookService(tokens.getAccessToken(), email);
 		
 		// Sort by start time in descending order
-		String sort = "Start/DateTime DESC";
+		String sort = "start/DateTime DESC";
 		// Only return the properties we care about
-		String properties = "Organizer,Subject,Start,End";
+		String properties = "organizer,subject,start,end";
 		// Return at most 10 events
 		Integer maxResults = 10;
 		

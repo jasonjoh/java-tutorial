@@ -1,19 +1,13 @@
 package com.outlook.dev.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Contact {
-	@JsonProperty("Id")
 	private String id;
-	@JsonProperty("GivenName")
 	private String givenName;
-	@JsonProperty("Surname")
 	private String surname;
-	@JsonProperty("CompanyName")
 	private String companyName;
-	@JsonProperty("EmailAddresses")
 	private EmailAddress[] emailAddresses;
 	
 	public String getId() {

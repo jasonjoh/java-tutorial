@@ -3,13 +3,10 @@ package com.outlook.dev.service;
 import java.util.Date;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DateTimeTimeZone {
-	@JsonProperty("DateTime")
 	private Date dateTime;
-	@JsonProperty("TimeZone")
 	private String timeZone;
 	
 	public Date getDateTime() {

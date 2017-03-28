@@ -49,7 +49,7 @@ public class AuthorizeController {
 				OutlookUser user;
 				try {
 					user = outlookService.getCurrentUser().execute().body();
-					session.setAttribute("userEmail", user.getEmailAddress());
+					session.setAttribute("userEmail", user.getMail());
 				} catch (IOException e) {
 					session.setAttribute("error", e.getMessage());
 				}
