@@ -1,4 +1,4 @@
-package com.outlook.dev.auth;
+package jp.drjoy.calendar.client.outlook.auth;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

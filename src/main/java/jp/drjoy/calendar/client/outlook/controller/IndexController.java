@@ -1,4 +1,4 @@
-package com.outlook.dev.controller;
+package jp.drjoy.calendar.client.outlook.controller;
 
 import java.util.UUID;
 
@@ -9,7 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-import com.outlook.dev.auth.AuthHelper;
+import jp.drjoy.calendar.client.outlook.auth.AuthHelper;
 
 @Controller
 public class IndexController {

@@ -1,4 +1,4 @@
-package com.outlook.dev.auth;
+package jp.drjoy.calendar.client.outlook.auth;
 
 import java.util.Base64;
 import java.util.Date;

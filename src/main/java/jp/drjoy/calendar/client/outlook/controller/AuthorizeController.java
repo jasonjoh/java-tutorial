@@ -1,4 +1,4 @@
-package com.outlook.dev.controller;
+package jp.drjoy.calendar.client.outlook.controller;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.outlook.dev.auth.AuthHelper;
-import com.outlook.dev.auth.IdToken;
-import com.outlook.dev.auth.TokenResponse;
-import com.outlook.dev.service.OutlookService;
-import com.outlook.dev.service.OutlookServiceBuilder;
-import com.outlook.dev.service.OutlookUser;
+import jp.drjoy.calendar.client.outlook.auth.AuthHelper;
+import jp.drjoy.calendar.client.outlook.auth.IdToken;
+import jp.drjoy.calendar.client.outlook.auth.TokenResponse;
+import jp.drjoy.calendar.client.outlook.service.OutlookService;
+import jp.drjoy.calendar.client.outlook.service.OutlookServiceBuilder;
+import jp.drjoy.calendar.client.outlook.service.OutlookUser;
 
 @Controller
 public class AuthorizeController {
