@@ -5,8 +5,16 @@ import jp.drjoy.calendar.client.outlook.auth.AuthHelper;
 
 public class Outlook {
 
+    /**
+     * 環境
+     *  - dev, stg, production
+     */
     private String env;
 
+    /**
+     * デバイス
+     *  - pc, sp, app
+     */
     private String device;
 
     private UUID state;
