@@ -4,9 +4,29 @@ import java.util.UUID;
 import jp.drjoy.calendar.client.outlook.auth.AuthHelper;
 
 public class Outlook {
+
+    private String env;
+
+    private String device;
+
+    private UUID state;
+
+    private UUID nonce;
+
+    public Outlook() {
+        this.env = "dev";
+        this.device = "pc";
+        this.state = UUID.randomUUID();
+        this.nonce = UUID.randomUUID();
+    }
+
+    public Outlook(String env, String device) {
+        this();
+        this.env = env;
+        this.device = device;
+    }
+
     public String getAuthUrl() {
-        UUID state = UUID.randomUUID();
-        UUID nonce = UUID.randomUUID();
-        return AuthHelper.getLoginUrl(state, nonce);
+        return AuthHelper.getLoginUrl(env, device, state, nonce);
     }
 }
