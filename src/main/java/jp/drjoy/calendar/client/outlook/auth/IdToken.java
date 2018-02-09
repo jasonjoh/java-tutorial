@@ -1,4 +1,4 @@
-package com.outlook.dev.auth;
+package jp.drjoy.calendar.client.outlook.auth;
 
 import java.util.Base64;
 import java.util.Date;
@@ -26,7 +26,7 @@ public class IdToken {
 	@JsonProperty("oid")
 	private String objectId;
 	
-	public static IdToken parseEncodedToken(String encodedToken, String nonce) {
+	public static IdToken parseEncodedToken(String encodedToken) {
 		// Encoded token is in three parts, separated by '.'
 		String[] tokenParts = encodedToken.split("\\.");
 		
@@ -39,9 +39,6 @@ public class IdToken {
 		IdToken newToken = null;
 		try {
 			newToken = mapper.readValue(decodedBytes, IdToken.class);
-			if (!newToken.isValid(nonce)) {
-				return null;
-			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		} 

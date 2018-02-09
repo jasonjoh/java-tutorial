@@ -9,7 +9,7 @@
 
 	<mvc:annotation-driven/>
 
-	<context:component-scan base-package="com.outlook.dev.controller"></context:component-scan>
+	<context:component-scan base-package="jp.drjoy.calendar.client.outlook.controller"></context:component-scan>
 
 	<bean id="tilesConfigurer"
 		class="org.springframework.web.servlet.view.tiles3.TilesConfigurer">

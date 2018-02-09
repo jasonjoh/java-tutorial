@@ -1,4 +1,4 @@
-package com.outlook.dev.service;
+package jp.drjoy.calendar.client.outlook.service;
 
 import java.util.Date;
 
