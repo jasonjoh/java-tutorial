@@ -27,11 +27,7 @@ public class OutlookServiceBuilder {
 						.header("return-client-request-id", "true")
 						.header("Authorization", String.format("Bearer %s", accessToken))
 						.method(original.method(), original.body());
-				
-				if (userEmail != null && !userEmail.isEmpty()) {
-					builder = builder.header("X-AnchorMailbox", userEmail);
-				}
-				
+
 				Request request = builder.build();
 				return chain.proceed(request);
 			}
