@@ -32,7 +32,9 @@ Here's what the details of your app registration should look like when you are d
 1. Open the `./src/main/resources/auth.properties` file.
 1. Replace `YOUR_APP_ID_HERE` with the **Application Id** from the registration you just created.
 1. Replace `YOUR_APP_PASSWORD_HERE` with the password you copied earlier.
-1. Right-click the project and choose **Run as**, then **Maven build**.
+1. If you use an IDE, Right-click the project and choose **Run as**, then **Maven build**.
+1. From a console, run **mvn package** and **mvn jetty:run** to start up a server
+1. Access `http://localhost:8080`
 
 ## Copyright ##
 
